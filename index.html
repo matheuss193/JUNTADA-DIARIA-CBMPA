@@ -229,6 +229,14 @@ textarea.in{min-height:84px;resize:vertical;line-height:1.35}
 .mm-h b{font:700 18px var(--f-display);letter-spacing:.02em;color:var(--heading)}
 .mm textarea[data-mm],.mm input[data-mm]{text-transform:uppercase}
 .mm pre{margin:0;padding:12px 14px;white-space:pre-wrap;font:15px/1.45 var(--f-body);overflow-wrap:anywhere}
+.mm-top{cursor:pointer;border-bottom:0}
+.mm.aberto .mm-top{border-bottom:1px solid var(--line)}
+.mm-t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 220px}
+.mm-t b{font:700 17px/1.2 var(--f-display);letter-spacing:.02em;color:var(--heading);overflow-wrap:anywhere}
+.mm-t span{font:600 13px var(--f-body);color:var(--muted)}
+.mm-seta{width:10px;height:10px;border-right:2.5px solid var(--muted);border-bottom:2.5px solid var(--muted);transform:rotate(45deg);margin:0 6px 4px 4px;transition:transform .15s}
+.mm.aberto .mm-seta{transform:rotate(-135deg);margin-bottom:-2px}
+.mm-corpo{display:none}.mm.aberto .mm-corpo{display:block}
 .mm .mm-f{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px}
 .mm details{border-top:1px dashed var(--line);padding-top:8px}
 .mm summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px}
@@ -1055,6 +1063,8 @@ const SHARED=[...OC_DADOS,"saida","sentinela","antes","ocx"];
 const ocDe=r=>r.oc||r.id;
 const grupo=r=>S.vtrs.filter(x=>ocDe(x)===ocDe(r)).sort((a,b)=>a.criado-b.criado);
 const desc=()=>meta.ordem!=="asc";
+/* rótulo do dia: saída antes das 09:00 sem "antes do início" é da manhã do dia seguinte (fim do serviço) */
+const diaSeg=r=>{const t=toMin(r.saida),tr=toMin(meta.troca)??540;return t!==null&&t<tr&&!(r.antes&&naJanelaAntes(r.saida))};
 const ordemBtn=()=>`<button type="button" class="mini ord-btn" data-ordem title="Trocar a ordem da lista">${desc()?"Recentes primeiro ↓":"Antigas primeiro ↑"}</button>`;
 function ligaOrdem(L,fn){const b=L.querySelector("[data-ordem]");if(b)b.onclick=e=>{e.stopPropagation();meta.ordem=desc()?"asc":"desc";saveMeta();fn()}}
 const grupos=arr=>{const m=new Map();arr.forEach(r=>{const k=ocDe(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});return [...m.values()].map(g=>g.sort((a,b)=>a.criado-b.criado))};
@@ -1320,7 +1330,7 @@ function renderVtr(){const L=$("#vtrList");const arr=ordena(S.vtrs,"saida");
     return `<div class="card oc ${okRev&&boOk?"tudo-ok":""}" data-id="${r.id}" role="button" tabindex="0">
     <div class="oc-top"><div class="main"><div class="t"><span class="numtag" title="Número da ocorrência neste serviço (identifica o desfecho)">Nº ${O.map(o=>num2(o.num)).join(" e ")}</span> ${esc(titulo)}</div><div class="s">${esc([ender,!multi&&r.condutor&&("Cond. "+r.condutor)].filter(Boolean).join(" · ")||"Toque para completar")}</div>
       <div class="pend">${O.map((o,i)=>`<label class="inl-wrap bo ${o.bo?"ok":"warn"}" title="Toque para ${o.bo?"alterar":"preencher"} o nº do BO${mo?" da "+(i+1)+"ª ocorrência":""}">${o.bo?(mo?`BO ${i+1}`:"BO"):(mo?`${i+1}ª`:"")}<input class="inl" data-inl="bo" data-oi="${i}" data-id="${r.id}" value="${esc(o.bo||"")}" placeholder="Sem nº do BO" size="${Math.max(o.bo?6:12,String(o.bo||"").length+1)}" autocapitalize="characters" autocomplete="off"></label>`).join("")}<span class="${okRev?"ok":"warn"}">REVISA${multi&&!okRev?` ${g.filter(x=>x.revisa).length}/${g.length}`:""}</span>${falta.length?`<span>Falta: ${esc(falta.join(" · "))}</span>`:""}</div></div>
-      <div class="time">${esc(r.saida||"--:--")}<small>${r.antes&&naJanelaAntes(r.saida)?"antes do início":"saída"}</small><button type="button" class="mini" data-gomm="${r.id}" title="Abrir no Min a Min"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Min a Min</button></div></div>
+      <div class="time">${esc(r.saida||"--:--")}<small>${r.antes&&naJanelaAntes(r.saida)?"antes do início":diaSeg(r)?"saída · dia seguinte":"saída"}</small><button type="button" class="mini" data-gomm="${r.id}" title="Abrir no Min a Min"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Min a Min</button></div></div>
     <div class="vrows">${g.map(x=>`<div class="vrow"><span class="tag ${x.chegada?"chegou":""}" title="${x.chegada?"Retornou às "+esc(x.chegada):"Em andamento"}">${esc(x.vtr||"VTR?")}</span>
       <span class="vst">${x.chegada?"":`<button type="button" class="mini chega" data-chegou="${x.id}" title="Marcar chegada com o horário de agora">Chegou agora</button>`}
         ${!x.hodoSaida?`<label class="inl-wrap hodo warn" title="Hodômetro de saída">Hod. saída<input class="inl" data-inl="hodoSaida" data-id="${x.id}" inputmode="decimal" placeholder="—" size="7" autocomplete="off"></label>`:""}
@@ -1507,7 +1517,7 @@ function ligaSugestoes(L){
 /* mensagem só do desfecho: curta, com o tipo e o número da ocorrência para identificar de qual é */
 function desfechoTexto(r,i){i=i||0;const o=ocGet(r,i),des=String(o.desfecho||"").trim();if(!des)return "";
   return `🚒 *9º GBM · ALTAMIRA*\n*${(mmVal(r,"tipo",i)||"OCORRÊNCIA").toUpperCase()}* · ${num2(o.num)}\n✅ ${des.toUpperCase()}`}
-function atualizaDes(el,r,i){const tx=desfechoTexto(r,i),bx=el.querySelector("[data-desfbox]");if(!bx)return;bx.hidden=!tx;const p=bx.querySelector("[data-pre-d]");if(p)p.textContent=tx;const av=bx.querySelector("[data-aviso]");if(av)av.hidden=!/\[[^\]]+\]/.test(tx);const wa=bx.querySelector("[data-wa-d]");if(wa)wa.href=waLink(tx||" ")}
+function atualizaDes(el,r,i){const tx=desfechoTexto(r,i),bx=el.querySelector("[data-desfbox]");if(!bx)return;bx.hidden=!tx;const p=bx.querySelector("[data-pre-d]");if(p)p.textContent=tx;const av=bx.querySelector("[data-aviso]");if(av)av.hidden=!/\[[^\]]+\]/.test(tx);}
 const GU_NOME={incendio:"Guarnição de incêndio",resgate:"Guarnição de resgate",salvamento:"Guarnição de salvamento"};
 function mmGuarnicoes(r,i){const m=mmGet(r,i||0),G=grupo(r);
   const bloco=(tit,itens)=>`👥 *${tit}*\n`+itens.map(i=>`• ${i}`).join("\n");
@@ -1531,47 +1541,54 @@ function pesTexto(g){const r=g[0],B=[];
   if(String(r.destino||"").trim())B.push(`🎯 *Destino:* ${r.destino.trim().toUpperCase()}`);
   if(String(r.obs||"").trim())B.push(`💬 *Observações*\n${r.obs.trim().toUpperCase()}`);
   return B.join("\n\n")}
-function vaiMM(id){mmAlvo=id;go("mm")}
-let mmAlvo=null;
+function vaiMM(id){mmAlvo=id;mmAlvoP=null;const r=S.vtrs.find(x=>x.id===id);if(r)mmAberto.add(`${grupo(r)[0].id}_0`);go("mm")}
+function vaiMMPes(id){const r=S.pessoas.find(x=>x.id===id);if(!r)return;mmAlvoP=gPes(r)[0].id;mmAlvo=null;mmAberto.add("p_"+mmAlvoP);go("mm")}
+let mmAlvo=null,mmAlvoP=null;const mmAberto=new Set();
 function mmItens(){let gs=grupos(ordena(S.vtrs,"saida"));if(desc())gs=gs.reverse();const out=[];gs.forEach(g=>{const r=g[0];ocsDe(r).forEach((o,i)=>out.push({r,i}))});return out}
 function renderMM(){const L=$("#mmList");const itens=mmItens();let pgs=gruposPes();if(desc())pgs=pgs.reverse();
   const guCard=guVazia()?`<div class="empty"><b>Guarnição do dia</b>Preencha a guarnição de serviço para gerar o texto de assunção.<button class="btn small primary" data-goGu>Preencher guarnição</button></div>`
     :`<article class="mm"><div class="mm-h"><b>Guarnição do dia</b><div class="row"><button class="btn small" data-goGu>Editar</button><button class="btn small" data-gushare>Compartilhar</button><button class="btn small primary" data-gucopy>Copiar</button></div></div><pre>${esc(guTexto())}</pre></article>`;
   const ligaGu=()=>{L.querySelectorAll("[data-goGu]").forEach(b=>b.onclick=()=>go("gu"));const c=L.querySelector("[data-gucopy]");if(c)c.onclick=()=>copiar(guTexto());const s2=L.querySelector("[data-gushare]");if(s2)s2.onclick=()=>compartilhaTexto(guTexto())};
   if(!itens.length&&!pgs.length){L.innerHTML=guCard+`<div class="empty"><b>Ainda não há saídas</b>Cada saída de viatura vira um bloco aqui, pronto para copiar no WhatsApp.</div>`;ligaGu();return}
-  const art=({r,i})=>{const m=mmGet(r,i),O=ocsDe(r),o=ocGet(r,i),sid=`${r.id}_${i}`;return `<article class="mm" data-id="${r.id}" data-oi="${i}">
-    <div class="mm-h"><b>${esc(grupo(r).map(x=>x.vtr||"VTR").join(" + "))} · ${esc(r.saida||"--:--")}${O.length>1?` · ocorrência ${i+1}/${O.length}`:""}</b><div class="row"><a class="btn small" data-wa target="_blank" rel="noopener" href="${waLink(mmTexto(r,i))}">WhatsApp</a><button class="btn small" data-share>Compartilhar</button><button class="btn small primary" data-copy>Copiar</button></div></div>
+  const art=({r,i})=>{const m=mmGet(r,i),O=ocsDe(r),o=ocGet(r,i),sid=`${r.id}_${i}`;const tit=String(mmVal(r,"tipo",i)||mmVal(r,"destino",i)||"").trim()||"Saída sem tipo",ab=mmAberto.has(sid);return `<article class="mm ${ab?"aberto":""}" data-id="${r.id}" data-oi="${i}">
+    <div class="mm-h mm-top" data-tog role="button" tabindex="0" aria-expanded="${ab}"><div class="mm-t"><b>${esc(tit.toUpperCase())}</b><span>${esc(grupo(r).map(x=>x.vtr||"VTR").join(" + "))} · ${esc(r.saida||"--:--")}${diaSeg(r)?" (dia seguinte)":r.antes&&naJanelaAntes(r.saida)?" (antes do início)":""} · nº ${num2(o.num)}${O.length>1?` · ocorrência ${i+1}/${O.length}`:""}</span></div><div class="row"><button class="btn small" data-share>Compartilhar</button><button class="btn small primary" data-copy>Copiar</button><i class="mm-seta" aria-hidden="true"></i></div></div>
+    <div class="mm-corpo">
     <pre data-pre>${esc(mmTexto(r,i))}</pre>
     <div class="mm-f">
       <div class="f"><label for="d_${sid}">Desfecho da ocorrência nº ${num2(o.num)} <small style="font-weight:600;text-transform:none;letter-spacing:0">(escreva depois: gera uma mensagem só do desfecho, sem repetir a ocorrência)</small></label><input class="in" id="d_${sid}" data-desf autocapitalize="characters" autocomplete="off" placeholder="Ex.: VÍTIMA ENCAMINHADA AO HOSPITAL REGIONAL. SEM OUTRAS INTERCORRÊNCIAS." value="${esc(o.desfecho||"")}"></div>${sugHTML(r,i)}
-      <div class="desf" data-desfbox ${desfechoTexto(r,i)?"":"hidden"}><div class="mm-h"><b>Mensagem do desfecho · nº ${num2(o.num)}</b><div class="row"><a class="btn small" data-wa-d target="_blank" rel="noopener" href="${waLink(desfechoTexto(r,i)||" ")}">WhatsApp</a><button class="btn small" data-share-d>Compartilhar</button><button class="btn small primary" data-copy-d>Copiar</button></div></div><pre data-pre-d>${esc(desfechoTexto(r,i))}</pre><div class="desf-aviso" data-aviso ${/\[[^\]]+\]/.test(desfechoTexto(r,i))?"":"hidden"}>⚠ Falta completar o que está entre [colchetes] antes de enviar.</div></div>
+      <div class="desf" data-desfbox ${desfechoTexto(r,i)?"":"hidden"}><div class="mm-h"><b>Mensagem do desfecho · nº ${num2(o.num)}</b><div class="row"><button class="btn small" data-share-d>Compartilhar</button><button class="btn small primary" data-copy-d>Copiar</button></div></div><pre data-pre-d>${esc(desfechoTexto(r,i))}</pre><div class="desf-aviso" data-aviso ${/\[[^\]]+\]/.test(desfechoTexto(r,i))?"":"hidden"}>⚠ Falta completar o que está entre [colchetes] antes de enviar.</div></div>
       <div class="f"><label for="o_${sid}">Observações</label><input class="in" id="o_${sid}" data-mm="obs" autocapitalize="characters" value="${esc(m.obs)}"></div>
       <details><summary>Ajustar o texto só no minuto a minuto</summary><div class="grid" style="margin-top:10px">
       ${MM_SYNC.map(k=>`<div class="f ${["endereco","coord","guarnicao","destino","tipo"].includes(k)?"full":""}"><label for="mv_${k}_${sid}">${MM_LBL[k]}</label>
         <input class="in" id="mv_${k}_${sid}" data-ov="${k}" value="${esc(mmVal(r,k,i))}">
         ${k in m.ov?`<span class="ov">Editado aqui <button data-reset="${k}">voltar ao automático</button></span>`:""}</div>`).join("")}
-      </div></details></div></article>`};
-  const artP=g=>{const r=g[0],nomes=g.map(x=>x.nome||"Sem nome");return `<article class="mm" data-pg="${r.id}">
-    <div class="mm-h"><b>${esc(nomes.slice(0,2).join(" + "))}${nomes.length>2?` +${nomes.length-2}`:""} · ${esc(r.entrada||"--:--")}</b><div class="row"><a class="btn small" data-wa target="_blank" rel="noopener" href="${waLink(pesTexto(g))}">WhatsApp</a><button class="btn small" data-share>Compartilhar</button><button class="btn small primary" data-copy>Copiar</button></div></div>
-    <pre data-pre>${esc(pesTexto(g))}</pre>
-    <div class="mm-f"><div class="f"><label for="po_${r.id}">Observações</label><input class="in" id="po_${r.id}" data-pobs autocapitalize="characters" autocomplete="off" value="${esc(r.obs||"")}"></div></div></article>`};
+      </div></details></div></div></article>`};
+  const artP=g=>{const r=g[0],nomes=g.map(x=>x.nome||"Sem nome");const ab=mmAberto.has("p_"+r.id);return `<article class="mm ${ab?"aberto":""}" data-pg="${r.id}">
+    <div class="mm-h mm-top" data-tog role="button" tabindex="0" aria-expanded="${ab}"><div class="mm-t"><b>${esc(nomes.slice(0,2).join(" + "))}${nomes.length>2?` +${nomes.length-2}`:""}</b><span>Entrada ${esc(r.entrada||"--:--")}${String(r.destino||"").trim()?" · "+esc(r.destino.trim()):""}</span></div><div class="row"><button class="btn small" data-share>Compartilhar</button><button class="btn small primary" data-copy>Copiar</button><i class="mm-seta" aria-hidden="true"></i></div></div>
+    <div class="mm-corpo"><pre data-pre>${esc(pesTexto(g))}</pre>
+    <div class="mm-f"><div class="f"><label for="po_${r.id}">Observações</label><input class="in" id="po_${r.id}" data-pobs autocapitalize="characters" autocomplete="off" value="${esc(r.obs||"")}"></div></div></div></article>`};
   L.innerHTML=guCard+itens.map(art).join("")+(pgs.length?`<h3 class="mmsec">Entrada de militares e civis</h3>`+pgs.map(artP).join(""):"");
   ligaGu();ligaSugestoes(L);
+  L.querySelectorAll(".mm[data-id],.mm[data-pg]").forEach(el=>{const k=el.dataset.pg?"p_"+el.dataset.pg:`${el.dataset.id}_${el.dataset.oi}`,h=el.querySelector("[data-tog]");
+    const alt=()=>{const a=!el.classList.contains("aberto");el.classList.toggle("aberto",a);h.setAttribute("aria-expanded",a);a?mmAberto.add(k):mmAberto.delete(k)};
+    h.onclick=e=>{if(e.target.closest("button,a"))return;alt()};h.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&e.target===h){e.preventDefault();alt()}}});
   if(itens.length>1){const o=document.createElement("div");o.className="resumo";o.innerHTML=ordemBtn();L.insertBefore(o,L.children[1]||null);ligaOrdem(L,renderMM)}
   if(mmAlvo){const alvo=L.querySelector(`.mm[data-id="${CSS.escape(grupo(S.vtrs.find(x=>x.id===mmAlvo)||{id:mmAlvo})[0]?.id||mmAlvo)}"][data-oi="0"]`);mmAlvo=null;
+    if(alvo)setTimeout(()=>{alvo.scrollIntoView({behavior:"smooth",block:"start"});alvo.classList.add("pisca");setTimeout(()=>alvo.classList.remove("pisca"),1800)},60)}
+  if(mmAlvoP){const alvo=L.querySelector(`.mm[data-pg="${CSS.escape(mmAlvoP)}"]`);mmAlvoP=null;
     if(alvo)setTimeout(()=>{alvo.scrollIntoView({behavior:"smooth",block:"start"});alvo.classList.add("pisca");setTimeout(()=>alvo.classList.remove("pisca"),1800)},60)}
   const ligaCopia=(el,txt)=>{el.querySelector("[data-copy]").onclick=()=>copiar(txt());
     el.querySelector("[data-share]").onclick=async()=>{const t=txt();if(navigator.share){try{await navigator.share({text:t});return}catch(e){if(e&&e.name==="AbortError")return}}copiar(t)}};
   L.querySelectorAll(".mm[data-id]").forEach(el=>{const r=S.vtrs.find(x=>x.id===el.dataset.id),i=+el.dataset.oi||0,m=mmGet(r,i),pre=el.querySelector("[data-pre]");
     const maiusc=t=>{const up=t.value.toUpperCase();if(up!==t.value){const a=t.selectionStart,b=t.selectionEnd;t.value=up;try{t.setSelectionRange(a,b)}catch(x){}}};
-    el.addEventListener("input",e=>{const t=e.target;if(t.dataset.mm){maiusc(t);m[t.dataset.mm]=t.value}else if(t.dataset.desf!==undefined){maiusc(t);ocGet(r,i).desfecho=t.value;syncGrupo(r)}else if(t.dataset.ov){m.ov[t.dataset.ov]=t.value}else return;pre.textContent=mmTexto(r,i);const wa=el.querySelector("[data-wa]");if(wa)wa.href=waLink(mmTexto(r,i));atualizaDes(el,r,i);touch()});
+    el.addEventListener("input",e=>{const t=e.target;if(t.dataset.mm){maiusc(t);m[t.dataset.mm]=t.value}else if(t.dataset.desf!==undefined){maiusc(t);ocGet(r,i).desfecho=t.value;syncGrupo(r)}else if(t.dataset.ov){m.ov[t.dataset.ov]=t.value}else return;pre.textContent=mmTexto(r,i);atualizaDes(el,r,i);touch()});
     el.querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>{delete m.ov[b.dataset.reset];touch();renderMM()});
     ligaCopia(el,()=>mmTexto(r,i));
     const bd=el.querySelector("[data-desfbox]");if(bd){bd.querySelector("[data-copy-d]").onclick=()=>copiar(desfechoTexto(r,i));
       bd.querySelector("[data-share-d]").onclick=async()=>{const t=desfechoTexto(r,i);if(navigator.share){try{await navigator.share({text:t});return}catch(e){if(e&&e.name==="AbortError")return}}copiar(t)}}});
   L.querySelectorAll(".mm[data-pg]").forEach(el=>{const r0=S.pessoas.find(x=>x.id===el.dataset.pg),pre=el.querySelector("[data-pre]");
     el.addEventListener("input",e=>{const t=e.target;if(t.dataset.pobs===undefined)return;const up=t.value.toUpperCase();if(up!==t.value){const a=t.selectionStart,b=t.selectionEnd;t.value=up;try{t.setSelectionRange(a,b)}catch(x){}}
-      gPes(r0).forEach(x=>x.obs=t.value);const g=gPes(r0);pre.textContent=pesTexto(g);const wa=el.querySelector("[data-wa]");if(wa)wa.href=waLink(pesTexto(g));touch()});
+      gPes(r0).forEach(x=>x.obs=t.value);const g=gPes(r0);pre.textContent=pesTexto(g);touch()});
     ligaCopia(el,()=>pesTexto(gPes(r0)))})}
 $("#copyAll").onclick=()=>{const it=mmItens();if(!it.length)return toast("Nenhuma saída lançada.");copiar(it.map(({r,i})=>mmTexto(r,i)).join("\n\n———\n\n"))};
 
@@ -1589,9 +1606,10 @@ function renderPes(){const L=$("#pesList");let gs=gruposPes();if(desc())gs=gs.re
     const sub=[!mg&&r.doc&&(r.doc+(r.orgao?" "+r.orgao:"")),r.destino,r.obs&&("Obs.: "+r.obs)].filter(Boolean).join(" · ");
     return `<div class="card oc" data-id="${r.id}" role="button" tabindex="0">
     <div class="oc-top"><div class="main"><div class="t">${esc(titulo)}</div><div class="s">${esc(sub||"Toque para completar")}</div></div>
-      <div class="time">${esc(r.entrada||"--:--")}<small>entrada</small>${mg&&algum?`<button type="button" class="mini chega" data-saiutodos="${r.id}" title="Marcar a saída de todos com o horário de agora">Todos saíram agora</button>`:""}</div></div>
+      <div class="time">${esc(r.entrada||"--:--")}<small>entrada</small><button type="button" class="mini" data-gommp="${r.id}" title="Abrir o texto no Min a Min"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Min a Min</button>${mg&&algum?`<button type="button" class="mini chega" data-saiutodos="${r.id}" title="Marcar a saída de todos com o horário de agora">Todos saíram agora</button>`:""}</div></div>
     <div class="vrows">${g.map(x=>`<div class="vrow"><span class="tag ${x.saida?"chegou":""}">${esc(x.nome||"Sem nome")}</span><span class="vst">${esc(mg&&x.doc?x.doc+(x.orgao?" "+x.orgao:""):"")}</span>${x.entrada&&!x.saida?`<button type="button" class="mini chega" data-saiu="${x.id}" title="Marcar a saída com o horário de agora">Saiu agora</button>`:`<span class="km">${x.saida?"saiu "+esc(x.saida):"--:--"}</span>`}</div>`).join("")}</div></div>`}).join(""):`<div class="empty"><b>Nada encontrado</b>Tente outro nome, documento ou destino.</div>`);
   ligaOrdem(L,renderPes);
+  L.querySelectorAll("[data-gommp]").forEach(b=>b.onclick=e=>{e.stopPropagation();vaiMMPes(b.dataset.gommp)});
   L.querySelectorAll("[data-saiu]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=S.pessoas.find(v=>v.id===b.dataset.saiu);if(!x)return;x.saida=nowHM();touch();flush();renderPes();toast(`${x.nome||"Saída"} saiu às ${x.saida}.`)});
   L.querySelectorAll("[data-saiutodos]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=S.pessoas.find(v=>v.id===b.dataset.saiutodos);if(!x)return;const h=nowHM();let n=0;gPes(x).forEach(p=>{if(p.entrada&&!p.saida){p.saida=h;n++}});touch();flush();renderPes();toast(`${n} pessoa${n>1?"s":""} saiu${n>1?"ram":""} às ${h}.`)});
   L.querySelectorAll(".card").forEach(c=>{const abre=()=>editor("pes",c.dataset.id);c.onclick=e=>{if(e.target.closest(".mini"))return;abre()};c.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&e.target===c){e.preventDefault();abre()}}})}
