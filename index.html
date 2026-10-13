@@ -122,7 +122,7 @@ a.btn{text-decoration:none;color:inherit}
 .sdhead{display:flex;flex-direction:column;gap:10px}
 .sdtabs{position:sticky;top:0;z-index:3;margin:2px 0;box-shadow:0 6px 8px -6px rgba(0,0,0,.25)}
 .sdtabs button{font:700 17px var(--f-display);letter-spacing:.02em;min-height:46px}
-.sdtabs button small,.seg button[data-ronaba] small{display:inline-block;margin-left:6px;font:700 12px var(--f-body);letter-spacing:0;background:rgba(127,127,127,.28);border-radius:999px;padding:0 8px;color:inherit}
+.sdtabs button small{display:inline-block;margin-left:6px;font:700 12px var(--f-body);letter-spacing:0;background:rgba(127,127,127,.28);border-radius:999px;padding:0 8px;color:inherit}
 .antes{display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--warn);border-radius:12px;background:var(--surface-2)}
 .antes .seg button{display:flex;flex-direction:column;align-items:center;line-height:1.2}
 .antes .seg button small{font:600 12px var(--f-body);letter-spacing:0;opacity:.85}
@@ -658,7 +658,7 @@ document.body.appendChild(d)},4500);
       <div class="vh"><div><h1>Mapa de ronda</h1><p>Folha 3 · Quartos de hora</p></div></div>
       <div class="panel">
         <h2>Dividir os quartos automaticamente</h2>
-        <div class="seg" role="group" aria-label="Turnos"><button type="button" data-turnos="1">1 turno</button><button type="button" data-turnos="2">2 turnos</button></div>
+        <div class="seg" role="group" aria-label="Turno do mapa de ronda"><button type="button" data-turnos="1">1º turno</button><button type="button" data-turnos="2">2º turno</button></div>
         <div id="turnos" style="display:flex;flex-direction:column;gap:12px"></div>
         <span class="hint" style="font-size:12px;color:var(--muted)">“Gerar quartos” divide o período do turno em partes iguais. “+ Quarto” acrescenta um quarto à mão, começando onde o último termina. A folha sai sempre em ordem cronológica do serviço.</span>
       </div>
@@ -805,7 +805,10 @@ function hodoAnterior(r){const v=norm(r.vtr);if(!v)return null;const lista=orden
 function puxaHodo(r){if(String(r.hodoSaida||"").trim()&&!r._hodoAuto)return false;const h=hodoAnterior(r);if(!h)return false;if(r.hodoSaida===h.v)return false;r.hodoSaida=h.v;r._hodoAuto=true;return h}
 function migraRevisa(){S.vtrs.forEach(r=>{if(r.revisado&&r.revisa===undefined)r.revisa=true;delete r.revisado})}
 function preencheSentinelas(){if(!S.ronda||!S.ronda.length)return;
-  const f=(r,k)=>{if(r.antes&&k==="saida"){if(r._sentAuto&&r.sentinela){r.sentinela="";r._sentAuto=false}return}if(r.sentinela&&!r._sentAuto)return;const n=sentinelaEm(r[k]);if(n&&n!==r.sentinela){r.sentinela=n;r._sentAuto=true}};
+  const f=(r,k)=>{if(r._sentManual)return;/* o que a pessoa digitou (ou apagou) à mão não é mexido */
+    if(r.antes&&k==="saida"){if(r._sentAuto&&r.sentinela){r.sentinela="";r._sentAuto=false}return}
+    if(r.sentinela&&!r._sentAuto)return;const n=sentinelaEm(r[k]);if(n===r.sentinela)return;
+    if(n){r.sentinela=n;r._sentAuto=true}else if(r._sentAuto&&r.sentinela){r.sentinela="";r._sentAuto=true}/* o mapa mudou e ninguém cobre mais esse horário */};
   S.vtrs.forEach(r=>f(r,"saida"));(S.pessoas||[]).forEach(r=>f(r,"entrada"))}
 function flush(){clearTimeout(saveTimer);if(!dirty)return;try{migraRevisa();preencheSentinelas();S.vtrs.forEach(puxaHodo);atualizaHodoUlt()}catch(e){}S.atualizadoEm=Date.now();
   const ok=LS.set("dia:"+S.inicio,JSON.stringify(S));guardaIDB(S);if(ok||idbOK){dirty=false;lastSaved=new Date();colheNomes();storageOK=true}else storageOK=false;setChip()}
@@ -875,14 +878,25 @@ function acHide(){dd.hidden=true;ac=null}
 function acPick(i){if(!ac)return;const it=ac.items[i];if(it==null)return;const v=typeof it==="string"?it:it.manual;const cb=ac.onPick;acHide();cb(v)}
 dd.addEventListener("pointerdown",e=>{const b=e.target.closest("button[data-i]");if(!b)return;e.preventDefault();acPick(+b.dataset.i)});
 window.addEventListener("scroll",acPos,true);window.addEventListener("resize",acPos);if(window.visualViewport)visualViewport.addEventListener("resize",acPos);
+let acViaTab=false;
+/* se o texto digitado é uma opção exata (ou a única opção possível), devolve essa opção */
+function acResolve(kind,v){const q=norm(v);if(!q)return null;const ex=fonte(kind).find(n=>norm(n)===q);if(ex)return ex;const it=busca(kind,v);return it.length===1&&typeof it[0]==="string"?it[0]:null}
+/* devolve o foco ao campo sem abrir a lista de sugestões (ela só abre quando a pessoa digita) */
+function focoQuieto(inp){inp._quieto=true;try{inp.focus()}finally{inp._quieto=false}}
 function acLiga(inp,kind,onPick,excluir){inp.setAttribute("autocomplete","off");
-  const show=()=>acShow(inp,kind,onPick,excluir);inp.addEventListener("focus",show);inp.addEventListener("input",show);
+  /* só mostra a lista do campo em que a pessoa está: preencher um campo por programa não reabre a lista dele */
+  const show=()=>{if(document.activeElement!==inp||inp._quieto)return;acShow(inp,kind,onPick,excluir)};inp.addEventListener("focus",show);inp.addEventListener("input",show);
   inp.addEventListener("blur",()=>setTimeout(()=>{if(ac&&ac.inp===inp)acHide()},150));
   inp.addEventListener("keydown",e=>{if(!ac||ac.inp!==inp||dd.hidden)return;
     if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();ac.idx=(ac.idx+(e.key==="ArrowDown"?1:-1)+ac.items.length)%ac.items.length;dd.querySelectorAll("button").forEach((b,i)=>b.classList.toggle("on",i===ac.idx))}
-    else if(e.key==="Enter"&&ac.idx>=0){e.preventDefault();acPick(ac.idx)}else if(e.key==="Escape"){e.stopPropagation();acHide()}})}
+    else if(e.key==="Enter"&&ac.idx>=0){e.preventDefault();acPick(ac.idx)}
+    else if(e.key==="Tab"&&!e.shiftKey&&inp.dataset.tabok&&ac.idx>=0&&typeof ac.items[ac.idx]==="string"&&norm(inp.value)){acViaTab=true;try{acPick(ac.idx)}finally{acViaTab=false}}
+    else if(e.key==="Escape"){e.stopPropagation();acHide()}})}
 /* campo de um nome só (condutor, sentinela…) */
-function campoBusca(inp){acLiga(inp,inp.dataset.ac,v=>{inp.value=v;inp.dispatchEvent(new Event("input",{bubbles:true}));inp.blur()})}
+function campoBusca(inp){inp.dataset.tabok="1";
+  acLiga(inp,inp.dataset.ac,v=>{inp.value=v;inp.dispatchEvent(new Event("input",{bubbles:true}));if(!acViaTab)inp.blur()});
+  /* viatura digitada pela metade: ao sair do campo, vira a viatura certa se só houver uma possível */
+  if(inp.dataset.ac==="vtrs")inp.addEventListener("blur",()=>{const v=inp.value.trim();if(!v)return;const r=acResolve("vtrs",v);if(r&&norm(r)!==norm(v)){inp.value=r;inp.dispatchEvent(new Event("input",{bubbles:true}))}})}
 /* segurar e arrastar um item sobre outro troca os dois de lugar (mouse e toque) */
 function arrasta(cont,sel,troca){if(cont._arr)return;cont._arr=1;let src=null,ghost=null,alvo=null,t0=null,x0=0,y0=0,ativo=false;
   const fim=()=>{clearTimeout(t0);if(ghost)ghost.remove();ghost=null;if(src)src.classList.remove("arr-src");if(alvo)alvo.classList.remove("arr-alvo");
@@ -1031,7 +1045,7 @@ const ocGet=(r,i)=>(i>0&&r.ocx&&r.ocx[i-1])||r;
 const ocChave=(r,i)=>i>0&&ocGet(r,i)!==r?ocDe(r)+"#"+ocGet(r,i).id:ocDe(r);
 const ocNova=()=>({id:uid(),tipo:"",relato:"",endereco:"",bo:"",destino:"",coord:"",desfecho:""});
 /* o que é compartilhado pela saída vale para todas as viaturas dela */
-function syncGrupo(r){grupo(r).forEach(x=>{if(x!==r){SHARED.forEach(k=>{x[k]=r[k]});x._sentAuto=r._sentAuto}})}
+function syncGrupo(r){grupo(r).forEach(x=>{if(x!==r){SHARED.forEach(k=>{x[k]=r[k]});x._sentAuto=r._sentAuto;x._sentManual=r._sentManual}})}
 /* bairro = último item do endereço ("Rua X, 120, Centro" -> "Centro") */
 function bairroDe(e){const p=String(e||"").split(",").map(x=>x.trim()).filter(Boolean);if(p.length<2)return "";
   const b=p[p.length-1].replace(/^(bairro|b\.)\s*:?\s*/i,"").trim();return !b||/^(s\/?n|\d+\s*[a-z]?)$/i.test(b)?"":b}
@@ -1051,7 +1065,7 @@ const PES_PESSOA=["nome","doc","orgao","saida"],PES_SHARED=["entrada","destino",
 const gDe=r=>r.grp||r.id;
 const gPes=r=>S.pessoas.filter(x=>gDe(x)===gDe(r)).sort((a,b)=>a.criado-b.criado);
 const gruposPes=()=>{const m=new Map();ordena(S.pessoas,"entrada").forEach(r=>{const k=gDe(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});return [...m.values()].map(g=>g.sort((a,b)=>a.criado-b.criado))};
-function syncPes(r){gPes(r).forEach(x=>{if(x!==r){PES_SHARED.forEach(k=>{x[k]=r[k]});x._sentAuto=r._sentAuto}})}
+function syncPes(r){gPes(r).forEach(x=>{if(x!==r){PES_SHARED.forEach(k=>{x[k]=r[k]});x._sentAuto=r._sentAuto;x._sentManual=r._sentManual}})}
 const F_RON=[{k:"inicio",l:"Início",t:"time"},{k:"termino",l:"Término",t:"time"},
  {k:"sentinela",l:"Sentinela",ac:"nomes",up:1,ph:"Buscar militar",full:1},{k:"obsSent",l:"Observação (sentinela)",full:1},
  {k:"rondante",l:"Rondante",ac:"nomes",up:1,ph:"Buscar militar",full:1},{k:"obsRond",l:"Observação (rondante)",full:1}];
@@ -1097,7 +1111,7 @@ function editorSaida(id){
   if(oi>=ocsDe(r).length)oi=0;
   openModal(`<header><h3>Saída de viatura</h3><button class="btn primary small" data-x>Pronto</button></header>
     <div class="body">
-      <div class="sdhead"><div class="grid">${F_SAI.map(f=>fieldHTML(f,r)).join("")}</div><div id="sdAntes"></div></div>
+      <div class="sdhead"><div class="grid">${F_SAI.map(f=>fieldHTML(f,r)).join("")}</div><div id="sdSentAuto"></div><div id="sdAntes"></div></div>
       <div class="seg sdtabs" role="tablist" aria-label="Dados da saída"><button type="button" role="tab" data-tab="oc"></button><button type="button" role="tab" data-tab="vtr"></button></div>
       <div id="sdOc"></div><div id="sdVtr"></div>
     </div>
@@ -1142,20 +1156,25 @@ function editorSaida(id){
     P.querySelectorAll("[data-gus]").forEach(b=>b.onclick=()=>{const t=b.dataset.gus,l=(r.gus||[]).slice();const i2=l.indexOf(t);if(i2>=0)l.splice(i2,1);else l.push(t);montaGu(r,l);mostraEquipe();touch()});
     const inp=$$("#ocAdd");
     const add=v=>{v=limpaNome(v);if(!v)return;inp.value="";
-      if(!String(r.vtr||"").trim()){const el=$$("#f_vtr");el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));toast(`${v} lançada.`);setTimeout(()=>inp.focus(),0);return}
-      r.oc=ocDe(r);const n={id:uid(),criado:Date.now(),oc:r.oc,vtr:v};SHARED.forEach(k=>n[k]=r[k]);n._sentAuto=r._sentAuto;
-      if(!guVazia()){const t=vtrGu(v);if(t)montaGu(n,[t])}S.vtrs.push(n);puxaHodo(n);touch();desenhaTabs();lblTabs();toast(`${v} adicionada à saída.`);setTimeout(()=>inp.focus(),0)};
+      if(!String(r.vtr||"").trim()){const el=$$("#f_vtr");el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));toast(`${v} lançada.`);focoQuieto(inp);return}
+      r.oc=ocDe(r);const n={id:uid(),criado:Date.now(),oc:r.oc,vtr:v};SHARED.forEach(k=>n[k]=r[k]);n._sentAuto=r._sentAuto;n._sentManual=r._sentManual;
+      if(!guVazia()){const t=vtrGu(v);if(t)montaGu(n,[t])}S.vtrs.push(n);puxaHodo(n);touch();desenhaTabs();lblTabs();toast(`${v} adicionada à saída.`);focoQuieto(inp)};
     acLiga(inp,"vtrs",add,()=>grupo(r).map(x=>x.vtr).filter(Boolean));
-    inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&inp.value.trim()&&(dd.hidden||!ac)){e.preventDefault();add(inp.value)}})}
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&inp.value.trim()&&(dd.hidden||!ac)){e.preventDefault();add(inp.value)}});
+    /* digitou a viatura e foi para outro lugar (outra guia, Pronto…): entra se for uma viatura da lista */
+    inp.addEventListener("blur",()=>{const v=inp.value.trim();if(!v)return;const rs=acResolve("vtrs",v);if(rs)add(rs)})}
   /* --- horário que aparece duas vezes no serviço (ex.: 07:00 antes do início e 07:00 do fim) --- */
+  function desenhaSentAuto(){const A=$$("#sdSentAuto");if(!A)return;
+    A.innerHTML=r._sentManual?`<button type="button" class="btn small" data-sentauto style="align-self:flex-start">↺ Voltar ao sentinela do mapa de ronda</button>`:"";
+    const b=A.querySelector("[data-sentauto]");if(b)b.onclick=()=>{r._sentManual=false;r._sentAuto=true;const sn=r.antes?"":sentinelaEm(r.saida);r.sentinela=sn;const el=$$("#f_sentinela");if(el)el.value=sn;syncGrupo(r);touch();desenhaSentAuto()}}
   function desenhaAntes(){const A=$$("#sdAntes");if(!A)return;if(!naJanelaAntes(r.saida)){A.innerHTML="";return}
     const antes=!!r.antes,dA=dataDoHorario(S.inicio,r.saida,true),dB=dataDoHorario(S.inicio,r.saida,false);
     A.innerHTML=`<div class="antes"><span class="hint"><b>${esc(r.saida)}</b> existe duas vezes neste serviço. Qual é esta saída?</span>
       <div class="seg" role="group" aria-label="Qual horário"><button type="button" data-antes="1" aria-pressed="${antes}">Antes do início do serviço<small>${dA}</small></button><button type="button" data-antes="0" aria-pressed="${!antes}">No fim deste serviço<small>${dB}</small></button></div>
       <span class="hint">${antes?"Sai no alto da folha, antes das saídas do serviço (a saída que ficou sem lançar na juntada anterior).":"Sai no fim da folha, na manhã do dia seguinte."}</span></div>`;
     A.querySelectorAll("[data-antes]").forEach(b=>b.onclick=()=>{r.antes=b.dataset.antes==="1";const el=$$("#f_sentinela");
-      if(r.antes){if(r._sentAuto&&r.sentinela){r.sentinela="";r._sentAuto=false;if(el)el.value=""}}
-      else if(!r.sentinela||r._sentAuto){const sn=sentinelaEm(r.saida);r.sentinela=sn;r._sentAuto=true;if(el)el.value=sn}
+      if(r.antes){if(!r._sentManual&&r._sentAuto&&r.sentinela){r.sentinela="";r._sentAuto=false;if(el)el.value=""}}
+      else if(!r._sentManual&&(!r.sentinela||r._sentAuto)){const sn=sentinelaEm(r.saida);r.sentinela=sn;r._sentAuto=true;if(el)el.value=sn}
       puxaHodo(r);const h=$$("#f_hodoSaida");if(h&&r.hodoSaida)h.value=r.hodoSaida;
       syncGrupo(r);touch();desenhaAntes()})}
   const W=box.querySelector(".body");/* novo elemento a cada abertura: os eventos não vazam para outro lançamento */
@@ -1164,8 +1183,8 @@ function editorSaida(id){
     if(el.dataset.caps){const up=el.value.toUpperCase();if(up!==el.value){const a=el.selectionStart,b=el.selectionEnd;el.value=up;try{el.setSelectionRange(a,b)}catch(x){}}}
     const emOc=!!el.closest("#sdOc");alvoDe(el)[k]=el.value;
     if(emOc){if(k==="tipo"||k==="endereco")lblOc();syncGrupo(r);touch();return}
-    if(k==="sentinela")r._sentAuto=false;
-    if(k==="saida"){if(r._sentAuto||!r.sentinela){const sn=r.antes?"":sentinelaEm(r.saida);r.sentinela=sn;r._sentAuto=true;const el2=box.querySelector("#f_sentinela");if(el2)el2.value=sn}desenhaAntes()}
+    if(k==="sentinela"){r._sentAuto=false;r._sentManual=true;desenhaSentAuto()}
+    if(k==="saida"){if(r.antes&&!naJanelaAntes(r.saida))r.antes=false;if(!r._sentManual&&(r._sentAuto||!r.sentinela)){const sn=r.antes?"":sentinelaEm(r.saida);r.sentinela=sn;r._sentAuto=true;const el2=box.querySelector("#f_sentinela");if(el2)el2.value=sn}desenhaAntes()}
     if(/hodo/.test(k)){if(k==="hodoSaida")r._hodoAuto=false;const c=box.querySelector("#f_km");if(c)c.textContent=kmDe(r)||"—"}
     if(k==="chegada")desenhaTabs();
     if(k==="vtr"||k==="saida"){const h=puxaHodo(r);if(h){const e2=box.querySelector("#f_hodoSaida");if(e2)e2.value=r.hodoSaida;const c=box.querySelector("#f_km");if(c)c.textContent=kmDe(r)||"—";if(k==="vtr")toast(`Hodômetro de saída ${r.hodoSaida} puxado da ${h.de==="saida"?"última chegada":"juntada anterior"} da ${r.vtr}.`)}}
@@ -1177,7 +1196,7 @@ function editorSaida(id){
   W.addEventListener("input",e=>{if(e.target.dataset.k!=="vtr"||guVazia()||(r.gus&&r.gus.length))return;const t=vtrGu(e.target.value);if(t){montaGu(r,[t]);mostraEquipe();touch();toast(`Guarnição de ${GU_TIPOS[t].toLowerCase()} preenchida pela VTR.`)}});
   box.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{tab=edTabSaida=b.dataset.tab;lblTabs()});
   ligaBusca($$(".sdhead"));ligaNow($$(".sdhead"));
-  desenhaOc();desenhaVtr();desenhaAntes();lblTabs();
+  desenhaOc();desenhaVtr();desenhaSentAuto();desenhaAntes();lblTabs();
   if(novo&&tab==="vtr")setTimeout(()=>{const i=$$("#ocAdd");i&&i.focus()},80);
   box.querySelector("[data-x]").onclick=closeModal;
   box.querySelector("[data-del]").onclick=()=>ask(grupo(r).length>1?`Tirar ${esc(r.vtr||"esta viatura")} desta saída? As outras viaturas continuam.`:"Excluir este lançamento? Uma cópia fica guardada no histórico.","Excluir",()=>{
@@ -1199,7 +1218,7 @@ function editorPes(id){
      <h4 class="sec">Pessoa <span id="pNome"></span> <small>só desta pessoa</small></h4>
      <div class="grid">${campos(PES_PESSOA)}</div>
      <h4 class="sec">Entrada <small id="pVale">vale para todas</small></h4>
-     <div class="grid">${campos(PES_SHARED)}</div>
+     <div class="grid">${campos(PES_SHARED)}</div><div id="pSentAuto"></div>
     </div>
     <footer><button class="btn danger" data-del></button><span class="hint" style="font-size:12px;color:var(--muted)">Salva sozinho</span></footer>`,
     ()=>{const vazio=["nome","doc","orgao","destino","obs"].every(k=>!String(r[k]||"").trim());
@@ -1208,24 +1227,28 @@ function editorPes(id){
   const tabs=()=>{const G=gPes(r);$$("#pTabs").innerHTML=G.map(x=>`<button type="button" class="octab ${x.saida?"chegou":""}" data-tp="${x.id}" ${x===r?'aria-current="true"':""}>${esc(x.nome||"Sem nome")}<small>${x.saida?"saiu "+esc(x.saida):"dentro"}</small></button>`).join("");
     $$("#pNome").textContent=r.nome||"";const d=$$("[data-del]");d.textContent=G.length>1?"Tirar esta pessoa da entrada":"Excluir lançamento";$$("#pVale").textContent=G.length>1?`vale para as ${G.length} pessoas`:"vale para todas";
     $$("#pTabs").querySelectorAll("[data-tp]").forEach(b=>b.onclick=()=>{if(b.dataset.tp===r.id)return;const c=onClose;onClose=null;c&&c();acHide();editor("pes",b.dataset.tp)})};
-  const nova=nome=>{r.grp=gDe(r);const n={id:uid(),criado:Date.now(),grp:r.grp,nome:limpaNome(nome)};PES_SHARED.forEach(k=>n[k]=r[k]);n._sentAuto=r._sentAuto;S.pessoas.push(n);return n};
+  const sentAuto=()=>{const A=$$("#pSentAuto");A.innerHTML=r._sentManual?`<button type="button" class="btn small" data-sentauto style="align-self:flex-start;margin-top:8px">↺ Voltar ao sentinela do mapa de ronda</button>`:"";
+    const b=A.querySelector("[data-sentauto]");if(b)b.onclick=()=>{r._sentManual=false;r._sentAuto=true;const sn=sentinelaEm(r.entrada);r.sentinela=sn;const el=$$("#f_sentinela");if(el)el.value=sn;syncPes(r);touch();sentAuto()}};
+  const nova=nome=>{r.grp=gDe(r);const n={id:uid(),criado:Date.now(),grp:r.grp,nome:limpaNome(nome)};PES_SHARED.forEach(k=>n[k]=r[k]);n._sentAuto=r._sentAuto;n._sentManual=r._sentManual;S.pessoas.push(n);return n};
   const add=v=>{v=limpaNome(v);if(!v)return;$$("#pAdd").value="";
-    if(!String(r.nome||"").trim()){const el=$$("#f_nome");el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));setTimeout(()=>$$("#pAdd").focus(),0);return}
-    nova(v);touch();tabs();toast(`${v} adicionado à entrada.`);setTimeout(()=>$$("#pAdd").focus(),0)};
+    if(!String(r.nome||"").trim()){const el=$$("#f_nome");el.value=v;el.dispatchEvent(new Event("input",{bubbles:true}));focoQuieto($$("#pAdd"));return}
+    nova(v);touch();tabs();toast(`${v} adicionado à entrada.`);focoQuieto($$("#pAdd"))};
   acLiga($$("#pAdd"),"nomes",add,()=>gPes(r).map(x=>x.nome).filter(Boolean));
   $$("#pAdd").addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.value.trim()&&(dd.hidden||!ac)){e.preventDefault();add(e.target.value)}});
+  /* digitou o nome e foi para outro lugar: entra na entrada (nome da lista ou como foi digitado) */
+  $$("#pAdd").addEventListener("blur",()=>{const v=$$("#pAdd").value.trim();if(!v)return;add(acResolve("nomes",v)||v)});
   $$("#pLote").onclick=()=>{const b=$$("#pLoteBox");b.hidden=!b.hidden;if(!b.hidden)$$("#pLoteTxt").focus()};
   $$("#pLoteOk").onclick=()=>{const nomes=$$("#pLoteTxt").value.split("\n").map(limpaNome).filter(Boolean);if(!nomes.length)return toast("Escreva um nome por linha.");
     let n0=0;nomes.forEach(n=>{if(!String(r.nome||"").trim()){r.nome=n;const el=$$("#f_nome");if(el)el.value=n}else{nova(n);n0++}});
     $$("#pLoteTxt").value="";$$("#pLoteBox").hidden=true;touch();tabs();toast(`${nomes.length} pessoa${nomes.length>1?"s":""} na entrada.`)};
   W.addEventListener("input",e=>{const el=e.target,k=el.dataset.k;if(!k)return;r[k]=el.value;
-    if(k==="sentinela")r._sentAuto=false;
-    if(k==="entrada"){if(r._sentAuto||!r.sentinela){const sn=sentinelaEm(r.entrada);r.sentinela=sn;r._sentAuto=true;const e2=box.querySelector("#f_sentinela");if(e2)e2.value=sn}}
+    if(k==="sentinela"){r._sentAuto=false;r._sentManual=true;sentAuto()}
+    if(k==="entrada"){if(!r._sentManual&&(r._sentAuto||!r.sentinela)){const sn=sentinelaEm(r.entrada);r.sentinela=sn;r._sentAuto=true;const e2=box.querySelector("#f_sentinela");if(e2)e2.value=sn}}
     if(PES_SHARED.includes(k))syncPes(r);
     if(k==="nome"||k==="saida")tabs();touch()});
   W.addEventListener("focusout",e=>{const el=e.target,k=el.dataset.k;if(!k)return;const f=F_PES.find(x=>x.k===k);if(f&&f.up&&el.value){const u=el.value.toUpperCase();if(u!==el.value){el.value=u;r[k]=u;if(PES_SHARED.includes(k))syncPes(r);touch()}}});
   box.querySelectorAll("[data-now]").forEach(b=>b.onclick=()=>{const k=b.dataset.now,i=box.querySelector("#f_"+k);i.value=nowHM();i.dispatchEvent(new Event("input",{bubbles:true}))});
-  ligaBusca(W);tabs();
+  ligaBusca(W);tabs();sentAuto();
   if(novo)setTimeout(()=>{const f=$$("#f_nome");f&&f.focus()},80);
   box.querySelector("[data-x]").onclick=closeModal;
   box.querySelector("[data-del]").onclick=()=>ask(gPes(r).length>1?`Tirar ${esc(r.nome||"esta pessoa")} desta entrada? As outras continuam.`:"Excluir este lançamento? Uma cópia fica guardada no histórico.","Excluir",()=>{snapshot("Antes de excluir um lançamento");S.pessoas.splice(S.pessoas.indexOf(r),1);touch();flush();toast("Lançamento excluído.")})}
@@ -1255,7 +1278,7 @@ function renderVtr(){const L=$("#vtrList");const arr=ordena(S.vtrs,"saida");
     return `<div class="card oc ${okRev&&boOk?"tudo-ok":""}" data-id="${r.id}" role="button" tabindex="0">
     <div class="oc-top"><div class="main"><div class="t">${esc(titulo)}</div><div class="s">${esc([ender,!multi&&r.condutor&&("Cond. "+r.condutor)].filter(Boolean).join(" · ")||"Toque para completar")}</div>
       <div class="pend">${O.map((o,i)=>`<label class="inl-wrap bo ${o.bo?"ok":"warn"}" title="Toque para ${o.bo?"alterar":"preencher"} o nº do BO${mo?" da "+(i+1)+"ª ocorrência":""}">${o.bo?(mo?`BO ${i+1}`:"BO"):(mo?`${i+1}ª`:"")}<input class="inl" data-inl="bo" data-oi="${i}" data-id="${r.id}" value="${esc(o.bo||"")}" placeholder="Sem nº do BO" size="${Math.max(o.bo?6:12,String(o.bo||"").length+1)}" autocapitalize="characters" autocomplete="off"></label>`).join("")}<span class="${okRev?"ok":"warn"}">REVISA${multi&&!okRev?` ${g.filter(x=>x.revisa).length}/${g.length}`:""}</span>${falta.length?`<span>Falta: ${esc(falta.join(" · "))}</span>`:""}</div></div>
-      <div class="time">${esc(r.saida||"--:--")}<small>${r.antes?"antes do início":"saída"}</small><button type="button" class="mini" data-gomm="${r.id}" title="Abrir no Min a Min"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Min a Min</button></div></div>
+      <div class="time">${esc(r.saida||"--:--")}<small>${r.antes&&naJanelaAntes(r.saida)?"antes do início":"saída"}</small><button type="button" class="mini" data-gomm="${r.id}" title="Abrir no Min a Min"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Min a Min</button></div></div>
     <div class="vrows">${g.map(x=>`<div class="vrow"><span class="tag ${x.chegada?"chegou":""}" title="${x.chegada?"Retornou às "+esc(x.chegada):"Em andamento"}">${esc(x.vtr||"VTR?")}</span>
       <span class="vst">${x.chegada?"":`<button type="button" class="mini chega" data-chegou="${x.id}" title="Marcar chegada com o horário de agora">Chegou agora</button>`}
         ${!x.hodoSaida?`<label class="inl-wrap hodo warn" title="Hodômetro de saída">Hod. saída<input class="inl" data-inl="hodoSaida" data-id="${x.id}" inputmode="decimal" placeholder="—" size="7" autocomplete="off"></label>`:""}
@@ -1399,26 +1422,13 @@ $("#pesQ").addEventListener("input",e=>{pesQ=e.target.value;renderPes()});
 
 /* ---------- ronda ---------- */
 let ronAba=0;
-/* troca de lugar dois quartos: cada sentinela leva o seu tempo de duração; os horários de início ficam nas posições
-   e quartos que eram seguidos continuam seguidos (quartos de duração igual: troca só os nomes) */
-function trocaQuartos(arr,a,b){const lo=Math.min(a,b),hi=Math.max(a,b);
-  const dur=r=>{const x=toMin(r.inicio),y=toMin(r.termino);return x===null||y===null?null:((((y-x)%1440)+1440)%1440)||1440};
-  const enc=arr.map((r,i)=>i>0&&toMin(arr[i-1].termino)!==null&&toMin(arr[i-1].termino)===toMin(r.inicio));
-  const D=arr.map(dur);[D[a],D[b]]=[D[b],D[a]];
-  const A=arr[a],B=arr[b],igual=dur(A)===dur(B);
-  [A.sentinela,B.sentinela]=[B.sentinela,A.sentinela];[A.obsSent,B.obsSent]=[B.obsSent,A.obsSent];
-  if(igual)return;
-  let fimAnt=null;
-  for(let i=lo;i<=hi;i++){const r=arr[i];if(D[i]===null){fimAnt=null;continue}
-    const ini=(i>lo&&enc[i]&&fimAnt!==null)?fimAnt:toMin(r.inicio);if(ini===null){fimAnt=null;continue}
-    r.inicio=fmtHM(ini);r.termino=fmtHM(ini+D[i]);fimAnt=ini+D[i]}}
 function renderRon(){if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest("#turnos"))renderGen();const L=$("#ronList");const arr=ordenaRonda(S.ronda);
   if(!arr.length){L.innerHTML=`<div class="empty"><b>Sem quartos definidos</b>Use “Dividir os quartos” acima ou adicione um por um.</div>`;return}
   L.innerHTML=`<div class="panel" style="padding:4px 10px"><table class="rtable"><tbody>${arr.map(r=>`<tr data-id="${r.id}"><td class="h">${esc(r.inicio||"--:--")}–${esc(r.termino||"--:--")}</td>
     <td><b>${esc(r.sentinela||"—")}</b>${gen().turnos>1&&r.turno?`<span class="ttag">${r.turno}º T</span>`:""}${r.rondante?`<br><span style="color:var(--muted);font-size:14px">Rondante: ${esc(r.rondante)}</span>`:""}</td></tr>`).join("")}</tbody></table></div>
-    <div class="row" style="justify-content:space-between;align-items:center"><span class="hint" style="font-size:12px;color:var(--muted)">Segure e arraste um quarto sobre outro para trocar os sentinelas de lugar. Cada um leva o seu tempo (se os quartos forem de durações diferentes, os horários se ajustam).</span><button class="btn danger" id="ronClear">Apagar todos os quartos</button></div>`;
+    <div class="row" style="justify-content:space-between;align-items:center"><span class="hint" style="font-size:12px;color:var(--muted)">Segure e arraste um quarto sobre outro para trocar os sentinelas de horário. Para mudar um horário, toque no quarto e digite: o que você digitar prevalece.</span><button class="btn danger" id="ronClear">Apagar todos os quartos</button></div>`;
   L.querySelectorAll("tr").forEach((t,i)=>{t.dataset.i=i;t.onclick=()=>editor("ron",t.dataset.id)});
-  arrasta(L.querySelector("tbody"),"tr",(a,b)=>{const A=arr[a],B=arr[b];trocaQuartos(arr,a,b);touch();flush();renderRon();toast(`Trocados de lugar: ${A.sentinela||"—"} e ${B.sentinela||"—"}`)});
+  arrasta(L.querySelector("tbody"),"tr",(a,b)=>{const A=arr[a],B=arr[b];[A.sentinela,B.sentinela]=[B.sentinela,A.sentinela];[A.obsSent,B.obsSent]=[B.obsSent,A.obsSent];touch();flush();renderRon();toast(`Trocados: ${A.inicio} ↔ ${B.inicio}`)});
   $("#ronClear").onclick=()=>ask("Apagar todos os quartos de ronda deste serviço?","Apagar",()=>{snapshot("Antes de apagar a ronda");S.ronda=[];touch();flush()})}
 const fmtHM=t=>pad(Math.floor(((t%1440)+1440)%1440/60))+":"+pad(((t%1440)+1440)%1440%60);
 const fmtDur=m=>`${Math.floor(m/60)}h${pad(m%60)}`;
@@ -1433,8 +1443,8 @@ function prevTurno(i){const el=$("#gPrev"+i);if(!el)return;const q=quartos(i);
   if(!q){el.textContent="Preencha militares, início e término.";return}
   el.textContent=`${q.n} militares de ${fmtHM(q.ini)} às ${fmtHM(q.fim)} (${fmtDur(q.T)}) → ${fmtDur(q.base)} cada${q.sobra?`; os ${q.sobra} primeiros ficam com 1 min a mais`:""}.`}
 function renderGen(){const g=gen(),box2=$("#turnos");if(!box2)return;
-  document.querySelectorAll("[data-turnos]").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.turnos===g.turnos)));
   if(g.turnos<2||ronAba>1)ronAba=0;
+  document.querySelectorAll("[data-turnos]").forEach(b=>b.setAttribute("aria-pressed",String(+b.dataset.turnos===(g.turnos>1?ronAba+1:1))));
   const bloco=i=>{const t=g.t[i];return `<div class="turno" style="border-top:0;padding-top:0"><div class="grid">
     <div class="f"><label for="gQtd${i}">Militares</label><input class="in" id="gQtd${i}" data-g="qtd" data-i="${i}" type="number" inputmode="numeric" min="1" value="${esc(t.qtd)}"></div>
     <div class="f"><label for="gRond${i}">Rondante (opcional)</label><input class="in" id="gRond${i}" data-g="rond" data-i="${i}" data-ac="nomes" placeholder="Igual em todos" value="${esc(t.rond)}"></div>
@@ -1443,25 +1453,24 @@ function renderGen(){const g=gen(),box2=$("#turnos");if(!box2)return;
     <div class="f full"><label for="gNomes${i}">Sentinelas, na ordem dos quartos (opcional)</label><span class="hint">Segure e arraste um nome sobre outro para trocar a ordem.</span><textarea class="in" id="gNomes${i}" data-g="nomes" data-i="${i}" data-ordem="1" data-chips="Buscar militar para o próximo quarto">${esc(t.nomes)}</textarea>
       <span class="hint" id="gPrev${i}"></span></div></div>
     <div class="row"><button class="btn ${g.turnos>1?"primary":""}" type="button" data-gerar="${i}">Gerar quartos${g.turnos>1?` do ${i+1}º turno`:""}</button>${g.turnos===1?`<button class="btn primary" type="button" data-add>+ Quarto</button>`:""}</div></div>`};
-  const n=i=>S.ronda.filter(r=>r.turno===i+1).length;
-  const abas=g.turnos>1?`<div class="seg" role="tablist" aria-label="Turno do mapa de ronda">${[0,1].map(i=>`<button type="button" role="tab" data-ronaba="${i}" aria-pressed="${ronAba===i}" aria-selected="${ronAba===i}">${i+1}º turno${n(i)?` <small>${n(i)} quartos</small>`:""}</button>`).join("")}</div>`:"";
-  box2.innerHTML=abas+bloco(ronAba)+(g.turnos>1?`<div class="row"><button class="btn" type="button" data-add>+ Quarto avulso</button></div>`:"");
+  box2.innerHTML=bloco(ronAba)+(g.turnos>1?`<div class="row"><button class="btn" type="button" data-add>+ Quarto avulso</button></div>`:"");
   ligaBusca(box2);[0,1].forEach(prevTurno);
-  box2.querySelectorAll("[data-ronaba]").forEach(b=>b.onclick=()=>{ronAba=+b.dataset.ronaba;renderGen()});
   box2.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>editor("ron"));
   box2.querySelectorAll("[data-gerar]").forEach(b=>b.onclick=()=>gerarTurno(+b.dataset.gerar))}
 document.addEventListener("input",e=>{const t=e.target;if(!t.dataset||!t.dataset.g)return;const i=+t.dataset.i,g=gen();g.t[i][t.dataset.g]=t.value;
   if(t.dataset.g==="nomes"){const n=t.value.split("\n").filter(x=>x.trim()).length;if(n){g.t[i].qtd=String(n);const q=$("#gQtd"+i);if(q)q.value=n}}
   prevTurno(i);touch();guardaBase()});
-document.querySelectorAll("[data-turnos]").forEach(b=>b.onclick=()=>{const g=gen();g.turnos=+b.dataset.turnos;ronAba=0;
-  if(g.turnos===2&&!g.t[1].ini&&!g.t[1].fim){g.t[1].ini=g.t[0].fim;g.t[1].fim=g.t[0].ini;if(!g.t[1].qtd)g.t[1].qtd=g.t[0].qtd}
+/* duas guias: "1º turno" e "2º turno". Abrir o 2º turno passa o mapa para 2 turnos; voltar ao 1º, sem nenhum quarto do 2º, volta para 1 turno */
+document.querySelectorAll("[data-turnos]").forEach(b=>b.onclick=()=>{const g=gen(),q=+b.dataset.turnos;
+  if(q===2){if(g.turnos!==2){g.turnos=2;if(!g.t[1].ini&&!g.t[1].fim){g.t[1].ini=g.t[0].fim;g.t[1].fim=g.t[0].ini;if(!g.t[1].qtd)g.t[1].qtd=g.t[0].qtd}}ronAba=1}
+  else{ronAba=0;if(g.turnos===2&&!S.ronda.some(r=>r.turno===2))g.turnos=1}
   touch();guardaBase();renderGen();renderRon()});
 function gerarTurno(i){const g=gen(),q=quartos(i);if(!q)return toast("Confira militares, início e término.");
   const meus=g.turnos===1?S.ronda:S.ronda.filter(r=>r.turno===i+1);
   const go=()=>{if(meus.length)snapshot("Antes de gerar a ronda");const rond=limpaNome(g.t[i].rond);
     const novos=q.out.map(x=>({id:uid(),criado:Date.now(),turno:i+1,inicio:x.inicio,termino:x.termino,sentinela:x.sentinela,rondante:rond}));
     novos.forEach(r=>contaCampos("ron",r,F_RON));
-    S.ronda=(g.turnos===1?[]:S.ronda.filter(r=>r.turno!==i+1)).concat(novos);if(g.turnos>1&&i===0&&!S.ronda.some(r=>r.turno===2))ronAba=1;touch();flush();renderAll();toast(`${q.n} quartos gerados${g.turnos>1?` no ${i+1}º turno`:""}.`)};
+    S.ronda=(g.turnos===1?[]:S.ronda.filter(r=>r.turno!==i+1)).concat(novos);touch();flush();renderAll();toast(`${q.n} quartos gerados${g.turnos>1?` no ${i+1}º turno`:""}.`)};
   meus.length?ask(g.turnos===1?"Substituir os quartos que já existem?":`Substituir os quartos já gerados do ${i+1}º turno?`,"Substituir",go):go()}
 
 /* ---------- folhas oficiais ---------- */
