@@ -1350,7 +1350,7 @@ function mmVal(r,k,i){i=i||0;const m=mmGet(r,i);if(k in m.ov)return m.ov[k];cons
   return r[k]||""}
 /* texto do Min a Min para WhatsApp: blocos curtos, um dado por linha, destaques em negrito */
 function mmTexto(r,i){i=i||0;const m=mmGet(r,i),v=k=>mmVal(r,k,i),G=grupo(r),B=[],O=ocsDe(r),o=ocGet(r,i);
-  const cab=[`🚒 *9º GBM · ALTAMIRA*`,`*${(v("tipo")||"OCORRÊNCIA").toUpperCase()}*`,`📌 *Ocorrência nº ${num2(o.num)}*`];if(O.length>1)cab.push(`🔁 _Ocorrência ${i+1} de ${O.length} desta saída_`);B.push(cab.join("\n"));
+  B.push([`🚒 *9º GBM · ALTAMIRA*`,`*${(v("tipo")||"OCORRÊNCIA").toUpperCase()}* · ${num2(o.num)}`].join("\n"));/* o número do serviço fica discreto, só depois do tipo */
   const rel=String(o.relato||(i===0?m.relato:"")||"").trim();if(rel)B.push(`📝 *Relato*\n${rel.toUpperCase()}`);
   const t=[`📅 ${dataDoHorario(S.inicio,v("saida"),r.antes)}`,`🕒 *Saída:* ${v("saida")||"--:--"}`];
   if("chegada" in m.ov){if(v("chegada"))t.push(`🏁 *Chegada:* ${v("chegada")}`)}
@@ -1366,9 +1366,9 @@ function mmTexto(r,i){i=i||0;const m=mmGet(r,i),v=k=>mmVal(r,k,i),G=grupo(r),B=[
   if(m.obs.trim())B.push(`💬 *Observações*\n${m.obs.trim().toUpperCase()}`);
   return B.join("\n\n")}
 /* mensagem só do desfecho (depois da ocorrência): traz o número, o tipo, o horário, o local e as viaturas para identificar de qual ocorrência é */
-function desfechoTexto(r,i){i=i||0;const o=ocGet(r,i),v=k=>mmVal(r,k,i),des=String(o.desfecho||"").trim();if(!des)return "";
-  const id=[`📅 ${dataDoHorario(S.inicio,v("saida"),r.antes)} · 🕒 ${v("saida")||"--:--"}`];if(v("endereco"))id.push(`📍 ${v("endereco")}`);if(v("vtr"))id.push(`🚨 ${v("vtr")}`);
-  return [`🚒 *9º GBM · ALTAMIRA*\n✅ *DESFECHO · OCORRÊNCIA Nº ${num2(o.num)}*\n*${(v("tipo")||"OCORRÊNCIA").toUpperCase()}*`,id.join("\n"),`📝 *Desfecho*\n${des.toUpperCase()}`].join("\n\n")}
+/* mensagem só do desfecho: curta, com o tipo e o número da ocorrência para identificar de qual é */
+function desfechoTexto(r,i){i=i||0;const o=ocGet(r,i),des=String(o.desfecho||"").trim();if(!des)return "";
+  return `🚒 *9º GBM · ALTAMIRA*\n*${(mmVal(r,"tipo",i)||"OCORRÊNCIA").toUpperCase()}* · ${num2(o.num)}\n✅ ${des.toUpperCase()}`}
 function atualizaDes(el,r,i){const tx=desfechoTexto(r,i),bx=el.querySelector("[data-desfbox]");if(!bx)return;bx.hidden=!tx;const p=bx.querySelector("[data-pre-d]");if(p)p.textContent=tx;const wa=bx.querySelector("[data-wa-d]");if(wa)wa.href=waLink(tx||" ")}
 const GU_NOME={incendio:"Guarnição de incêndio",resgate:"Guarnição de resgate",salvamento:"Guarnição de salvamento"};
 function mmGuarnicoes(r,i){const m=mmGet(r,i||0),G=grupo(r);
