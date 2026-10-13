@@ -131,6 +131,16 @@ a.btn{text-decoration:none;color:inherit}
 .numtag{display:inline-block;font:700 12px var(--f-body);letter-spacing:.02em;color:var(--navy-ink);background:var(--navy);border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:middle}
 .desf{border:1px dashed var(--line);border-radius:12px;margin:2px 0 6px;background:var(--surface-2)}
 .desf pre{margin:0;padding:10px 12px;white-space:pre-wrap;font:13.5px/1.5 var(--f-body)}
+.sug{display:flex;flex-direction:column;gap:8px;margin:2px 0 8px}
+.sug-t{font:600 12.5px var(--f-body);color:var(--muted)}
+.sug-l{display:flex;flex-direction:column;gap:6px}
+.chip-s{text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:9px 12px;font:500 14px/1.35 var(--f-body);cursor:pointer}
+.chip-s:hover{border-color:var(--accent);background:var(--accent-soft)}
+.sug-mais summary{cursor:pointer;font:600 13px var(--f-body);color:var(--accent);margin:2px 0 6px}
+.sug-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font:600 12.5px var(--f-body);color:var(--muted)}
+.chip-h{border:1px solid var(--navy);background:var(--surface);color:var(--navy);border-radius:999px;padding:6px 12px;font:700 12.5px var(--f-body);cursor:pointer}
+.chip-h:hover{background:var(--navy);color:var(--navy-ink)}
+.desf-aviso{padding:8px 12px;font:600 13px var(--f-body);color:var(--warn);border-top:1px dashed var(--line)}
 .mmsec{margin:10px 2px 0;font:700 19px var(--f-display);letter-spacing:.02em;color:var(--heading)}
 .tags{display:flex;flex-direction:column;gap:4px;align-items:stretch}
 .fora{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);padding:2px 2px}
@@ -1366,10 +1376,138 @@ function mmTexto(r,i){i=i||0;const m=mmGet(r,i),v=k=>mmVal(r,k,i),G=grupo(r),B=[
   if(m.obs.trim())B.push(`💬 *Observações*\n${m.obs.trim().toUpperCase()}`);
   return B.join("\n\n")}
 /* mensagem só do desfecho (depois da ocorrência): traz o número, o tipo, o horário, o local e as viaturas para identificar de qual ocorrência é */
+/* ---------- sugestões de desfecho (Min a Min) ----------
+   [HOSPITAL] vira "ao Hospital…/à UPA…" (a pessoa escolhe nos botões); [AMBULÂNCIA] vira "pela UR-119" (viatura de transporte, configurável);
+   [VIATURA] vira "pela ABT-43" / "pelas ABT-43 e UR-119" (as viaturas da própria ocorrência). O resto entre [colchetes] a pessoa completa. Tudo pode ser editado. */
+const AMB_PADRAO="UR-119";
+const HOSP_PADRAO=["ao Hospital Regional de Altamira","à UPA","ao Hospital Geral de Altamira (HGA)"];
+const hospitais=()=>meta.hospitais&&meta.hospitais.length?meta.hospitais:HOSP_PADRAO;
+const vtrAmbulancia=()=>meta.vtrAmb||AMB_PADRAO;
+const hospCurto=h=>h.replace(/^(ao|à|a|no|na)\s+/i,"");
+const DESF_CURINGA=[
+ "Situação controlada. Sem vítimas. Guarnição retornou ao quartel.",
+ "Ao chegar ao local, a situação já havia sido normalizada. Sem necessidade de intervenção.",
+ "Atendimento concluído sem intercorrências [VIATURA].",
+ "Solicitante orientado. Guarnição retornou ao quartel.",
+ "Vítima encaminhada [HOSPITAL] [AMBULÂNCIA].",
+ "Vítima recusou atendimento e transporte; assinou termo de recusa."];
+const APH_GERAL=["Paciente avaliado e encaminhado [HOSPITAL] [AMBULÂNCIA], consciente e orientado.","Paciente avaliado; recusou transporte; assinou termo de recusa.","Paciente avaliado sem alterações importantes; orientado a procurar atendimento médico se necessário.","Paciente entregue aos cuidados da família após avaliação."];
+const DESF_PADRAO={
+ "Incêndio em residência":["Fogo debelado e rescaldo realizado [VIATURA]. Sem vítimas. Danos materiais em [CÔMODO/ÁREA]. Imóvel entregue ao responsável.","Fogo debelado [VIATURA]. [N] vítima(s) com [LESÃO] encaminhada(s) [HOSPITAL] [AMBULÂNCIA]. Rescaldo realizado.","Princípio de incêndio controlado pelos moradores antes da chegada da guarnição. Vistoria realizada, sem risco remanescente.","Fogo debelado. Perda total do imóvel. Família sem ferimentos; Defesa Civil/Assistência acionada para apoio."],
+ "Incêndio em apartamento":["Fogo debelado e rescaldo realizado [VIATURA]. Sem vítimas. Fogo restrito ao apartamento [Nº]; sem propagação para os demais.","Fogo debelado. Edifício evacuado por precaução; moradores retornaram após vistoria. Sem vítimas.","Fogo debelado. [N] vítima(s) por inalação de fumaça encaminhada(s) [HOSPITAL] [AMBULÂNCIA]."],
+ "Incêndio em estabelecimento comercial":["Fogo debelado e rescaldo realizado [VIATURA]. Sem vítimas. Danos materiais em [ÁREA]. Local entregue ao responsável, [NOME].","Fogo debelado. Energia desligada pela concessionária. Local isolado para perícia.","Princípio de incêndio extinto com extintor pelos funcionários. Vistoria da guarnição sem risco remanescente."],
+ "Incêndio industrial":["Fogo debelado [VIATURA] após [HORAS] de combate. Sem vítimas. Rescaldo realizado e local entregue ao responsável técnico, [NOME].","Fogo controlado com apoio de [ÓRGÃO/EMPRESA]. Área isolada. Rescaldo em andamento sob responsabilidade de [QUEM]."],
+ "Incêndio em veículo":["Fogo debelado [VIATURA]. Sem vítimas. Veículo [MODELO/PLACA] com perda [TOTAL/PARCIAL]. Entregue ao proprietário.","Fogo debelado. Veículo [MODELO/PLACA] removido por [GUINCHO/PROPRIETÁRIO]. Via liberada.","Fogo debelado. [N] vítima(s) com queimaduras encaminhada(s) [HOSPITAL] [AMBULÂNCIA]."],
+ "Incêndio florestal":["Fogo controlado e rescaldo realizado em aproximadamente [ÁREA] [VIATURA]. Sem vítimas. Área monitorada.","Combate realizado com apoio de [ÓRGÃO/BRIGADA]. Fogo controlado; rescaldo sob responsabilidade de [QUEM].","Fogo extinto. Provável causa: [CAUSA]. Informado ao órgão ambiental."],
+ "Incêndio em vegetação ou pastagem":["Fogo debelado e rescaldo realizado [VIATURA]. Sem vítimas e sem danos a edificações. Área aproximada de [M²].","Fogo extinto antes de atingir [RESIDÊNCIAS/CERCA/LINHA DE ENERGIA]. Sem vítimas.","Ao chegar ao local, o fogo já havia se extinguido. Verificado que não há risco. Guarnição retornou.","Fogo debelado. Proprietário orientado sobre queimadas e riscos."],
+ "Incêndio em lixo ou entulho":["Fogo debelado e rescaldo realizado [VIATURA]. Sem vítimas. Responsável pelo local orientado.","Fogo extinto. Sem risco para edificações vizinhas."],
+ "Princípio de incêndio":["Princípio de incêndio extinto [VIATURA]. Sem vítimas, sem danos significativos. Causa provável: [CAUSA].","Situação controlada pelos moradores antes da chegada. Guarnição verificou e não há risco."],
+ "Vazamento de gás com risco de incêndio":["Vazamento contido com fechamento do registro. Ambiente ventilado. Sem vítimas. Responsável orientado.","Botijão removido para área aberta e isolado. Sem fogo. Responsável orientado a acionar a distribuidora.","Local evacuado e isolado. Distribuidora acionada. Sem vítimas. Guarnição aguardou a normalização."],
+ "Explosão":["Local isolado. Sem fogo. [N] vítima(s) encaminhada(s) [HOSPITAL] [AMBULÂNCIA].","Situação controlada. Área isolada para perícia. Sem vítimas."],
+ "Acidente de trânsito com vítima presa às ferragens":["Vítima desencarcerada e entregue à equipe de saúde. Encaminhada [HOSPITAL] [AMBULÂNCIA]. Via liberada.","[N] vítimas desencarceradas; [N] encaminhadas [HOSPITAL] [AMBULÂNCIA]. Veículo(s) removido(s) por [GUINCHO]. Via liberada.","Óbito constatado no local. [PM/POLÍCIA CIVIL/IML] acionado. Guarnição apoiou o isolamento até a chegada da perícia."],
+ "Capotamento":["[N] vítima(s) atendida(s) no local e encaminhada(s) [HOSPITAL] [AMBULÂNCIA]. Veículo removido por [GUINCHO/PROPRIETÁRIO].","Sem vítimas. Condutor orientado. Veículo removido. Via liberada.","Vítima recusou atendimento e transporte; assinou termo de recusa. Via liberada."],
+ "Colisão entre veículos":["Sem vítimas. Veículos removidos. Via liberada. Condutores orientados.","[N] vítima(s) com [LESÃO] encaminhada(s) [HOSPITAL] [AMBULÂNCIA]. Via liberada.","Vítimas recusaram atendimento. Trânsito normalizado com apoio de [PM/AGENTE DE TRÂNSITO]."],
+ "Queda de motociclista":["Vítima consciente, com [LESÃO], atendida no local e encaminhada [HOSPITAL] [AMBULÂNCIA]. Moto entregue a [QUEM].","Vítima recusou transporte; assinou termo de recusa. Moto removida.","Sem lesões aparentes. Orientações dadas. Via liberada."],
+ "Atropelamento":["Vítima atendida no local e encaminhada [HOSPITAL] [AMBULÂNCIA]. Condutor permaneceu no local; [PM/TRÂNSITO] informado.","Óbito constatado no local. [PM/POLÍCIA CIVIL/IML] acionado e local isolado.","Vítima recusou atendimento e transporte; assinou termo de recusa."],
+ "Resgate em altura":["Vítima resgatada [VIATURA] com técnicas de altura, sem ferimentos. Entregue aos cuidados da família.","Vítima resgatada e encaminhada [HOSPITAL] [AMBULÂNCIA]. Área liberada.","Pessoa orientada a descer com segurança; não foi necessário resgate técnico."],
+ "Resgate em poço ou cisterna":["Vítima retirada com vida, [COM/SEM] lesões, e encaminhada [HOSPITAL] [AMBULÂNCIA]. Poço sinalizado.","[ANIMAL/OBJETO] retirado do poço [VIATURA]. Local sinalizado e responsável orientado a proteger a abertura.","Óbito constatado. [POLÍCIA/IML] acionado. Local isolado."],
+ "Resgate em elevador":["Pessoa(s) retirada(s) do elevador [VIATURA], sem ferimentos. Empresa de manutenção acionada.","[N] pessoa(s) retirada(s) com [MAL-ESTAR/LESÃO] e encaminhada(s) [HOSPITAL] [AMBULÂNCIA]."],
+ "Resgate em área de difícil acesso":["Vítima localizada, resgatada e entregue à equipe de saúde. Encaminhada [HOSPITAL] [AMBULÂNCIA].","Vítima resgatada sem ferimentos e levada até [LOCAL]. Guarnição retornou ao quartel."],
+ "Busca por pessoa desaparecida":["Pessoa localizada com vida, [COM/SEM] lesões. Entregue à família.","Buscas realizadas por [TEMPO] sem localizar a pessoa. [PM/FAMÍLIA] acionada para continuidade.","Pessoa localizada sem vida. [POLÍCIA/IML] acionado. Local isolado."],
+ "Abertura de porta (pessoa trancada)":["Porta aberta [VIATURA]. Pessoa [COM/SEM] necessidade de atendimento. Sem danos [OU DANOS MÍNIMOS] à porta.","Pessoa acessada e encontrada [BEM/EM MAL-ESTAR]. Encaminhada [HOSPITAL] [AMBULÂNCIA].","Criança liberada sem ferimentos e entregue aos responsáveis."],
+ "Retirada de anel ou objeto preso":["Anel/objeto retirado com equipamento adequado. Sem lesões. Paciente orientado.","Objeto retirado. Paciente encaminhado [HOSPITAL] [AMBULÂNCIA] para avaliação."],
+ "Emergência clínica":APH_GERAL,"Mal súbito":APH_GERAL,"Desmaio (síncope)":["Paciente avaliado e encaminhado [HOSPITAL] [AMBULÂNCIA].","Paciente se recuperou no local, sem alterações. Recusou transporte; assinou termo de recusa.","Paciente entregue aos cuidados da família após avaliação."],
+ "Parada cardiorrespiratória":["Manobras de ressuscitação realizadas por [TEMPO]; retorno da circulação. Paciente encaminhado [HOSPITAL] [AMBULÂNCIA].","Manobras realizadas sem retorno da circulação. Óbito constatado por [MÉDICO/EQUIPE]. [POLÍCIA/IML] acionado.","Óbito constatado no local, sem indicação de manobras. [POLÍCIA/IML/SVO] acionado."],
+ "Dificuldade respiratória":["Paciente recebeu oxigenoterapia, melhorou e foi encaminhado [HOSPITAL] [AMBULÂNCIA].","Paciente com melhora no local; recusou transporte; assinou termo de recusa."],
+ "Engasgo (obstrução de vias aéreas)":["Desobstrução realizada com sucesso. Paciente consciente, encaminhado [HOSPITAL] [AMBULÂNCIA] para avaliação.","Desobstrução realizada. Paciente sem alterações; responsáveis orientados."],
+ "Convulsão":["Crise cessou no local. Paciente avaliado e encaminhado [HOSPITAL] [AMBULÂNCIA].","Paciente com histórico de convulsão, recuperado no local; recusou transporte; assinou termo."],
+ "Acidente vascular cerebral (AVC)":["Paciente avaliado, monitorado e encaminhado com prioridade [HOSPITAL] [AMBULÂNCIA]. Equipe do hospital informada."],
+ "Infarto":["Paciente avaliado, monitorado e encaminhado com prioridade [HOSPITAL] [AMBULÂNCIA]. Equipe do hospital informada."],
+ "Crise hipertensiva":["Paciente avaliado, monitorado e encaminhado [HOSPITAL] [AMBULÂNCIA].","Pressão controlada no local; paciente orientado. Recusou transporte; assinou termo de recusa."],
+ "Hipoglicemia":["Glicemia corrigida no local. Paciente consciente e orientado. Orientado/entregue à família.","Glicemia corrigida. Paciente encaminhado [HOSPITAL] [AMBULÂNCIA]."],
+ "Queda da própria altura":["Vítima atendida no local, [SEM/COM] lesões. Encaminhada [HOSPITAL] [AMBULÂNCIA].","Vítima sem lesões aparentes; recusou transporte; assinou termo de recusa. Entregue à família.","Vítima idosa avaliada e entregue aos cuidados da família, com orientação de procurar a unidade de saúde."],
+ "Queda com vítima":["Vítima imobilizada e encaminhada [HOSPITAL] [AMBULÂNCIA], com suspeita de [LESÃO].","Óbito constatado no local. [POLÍCIA/IML] acionado."],
+ "Queimadura":["Vítima com queimadura de [GRAU] em [REGIÃO] atendida e encaminhada [HOSPITAL] [AMBULÂNCIA].","Queimadura leve tratada no local; orientações dadas. Recusou transporte; assinou termo."],
+ "Intoxicação":["Paciente avaliado e encaminhado [HOSPITAL] [AMBULÂNCIA], com informação da substância ([NOME]).","Paciente assintomático; orientado a procurar atendimento. Recusou transporte; assinou termo."],
+ "Picada de animal peçonhento":["Vítima atendida e encaminhada [HOSPITAL] [AMBULÂNCIA] para soro/avaliação. Animal [CAPTURADO/NÃO LOCALIZADO].","Ferimento limpo e protegido. Vítima orientada a procurar a unidade de saúde. Recusou transporte; assinou termo."],
+ "Mordedura de animal":["Vítima atendida e encaminhada [HOSPITAL] [AMBULÂNCIA] para avaliação. Animal [CAPTURADO/NÃO LOCALIZADO].","Ferimento limpo e protegido. Vítima orientada a procurar a unidade de saúde. Recusou transporte; assinou termo."],
+ "Ferimento diverso":["Vítima atendida e encaminhada [HOSPITAL] [AMBULÂNCIA].","Vítima recusou transporte; assinou termo de recusa."],
+ "Ferimento por arma branca":["Vítima atendida e encaminhada [HOSPITAL] [AMBULÂNCIA]. [PM/POLÍCIA CIVIL] informada/presente.","Vítima recusou transporte; assinou termo de recusa. [PM] informada.","Óbito constatado no local. [POLÍCIA/IML] acionado; local preservado até a chegada."],
+ "Ferimento por arma de fogo":["Vítima atendida e encaminhada [HOSPITAL] [AMBULÂNCIA]. [PM/POLÍCIA CIVIL] informada/presente.","Vítima recusou transporte; assinou termo de recusa. [PM] informada.","Óbito constatado no local. [POLÍCIA/IML] acionado; local preservado até a chegada."],
+ "Agressão física":["Vítima atendida e encaminhada [HOSPITAL] [AMBULÂNCIA]. [PM/POLÍCIA CIVIL] informada/presente.","Vítima recusou transporte; assinou termo de recusa. [PM] informada."],
+ "Choque elétrico":["Vítima afastada da fonte e avaliada; encaminhada [HOSPITAL] [AMBULÂNCIA].","Vítima sem alterações; orientada a procurar avaliação médica. Concessionária acionada, se necessário."],
+ "Emergência obstétrica":["Gestante atendida e encaminhada [HOSPITAL] [AMBULÂNCIA]. Sem intercorrências no trajeto.","Gestante avaliada; recusou transporte; assinou termo de recusa."],
+ "Trabalho de parto":["Gestante atendida e encaminhada [HOSPITAL] [AMBULÂNCIA]. Sem intercorrências no trajeto.","Parto realizado às [HORA]; mãe e bebê encaminhados [HOSPITAL] [AMBULÂNCIA], em bom estado.","Gestante avaliada; recusou transporte; assinou termo de recusa."],
+ "Paciente psiquiátrico":["Paciente abordado, acalmado e encaminhado [HOSPITAL] [AMBULÂNCIA], com acompanhamento de [FAMILIAR/PM].","Paciente acalmado no local; familiares orientados e responsáveis pelo acompanhamento."],
+ "Contenção de paciente psiquiátrico":["Contenção realizada com apoio de [PM/FAMÍLIA]. Paciente encaminhado [HOSPITAL] [AMBULÂNCIA].","Paciente acalmado no local; familiares orientados."],
+ "Tentativa de suicídio":["Tentativa evitada. Paciente encaminhado [HOSPITAL] [AMBULÂNCIA] para avaliação.","Paciente acalmado no local; familiares orientados e responsáveis pelo acompanhamento."],
+ "Transporte clínico":["Paciente transportado de [ORIGEM] para [DESTINO] [AMBULÂNCIA], sem intercorrências, e entregue à equipe."],
+ "Transporte de paciente":["Paciente transportado de [ORIGEM] para [DESTINO] [AMBULÂNCIA], sem intercorrências, e entregue à equipe."],
+ "Óbito constatado no local":["Óbito constatado por [EQUIPE/MÉDICO]. [POLÍCIA/IML/SVO] acionado. Local preservado até a chegada. Familiares informados."],
+ "Afogamento":["Vítima resgatada com vida, atendida e encaminhada [HOSPITAL] [AMBULÂNCIA].","Vítima resgatada sem vida. Manobras realizadas sem sucesso. [POLÍCIA/IML] acionado."],
+ "Busca de desaparecido em rio":["Pessoa localizada com vida e entregue à família/equipe de saúde.","Buscas realizadas por [TEMPO] sem localizar a pessoa; [QUEM] acionado para continuidade.","Corpo localizado e retirado da água. [POLÍCIA/IML] acionado."],
+ "Resgate de embarcação":["Embarcação e [N] ocupante(s) resgatados [VIATURA], sem ferimentos, e levados até [LOCAL]."],
+ "Salvamento em enchente":["[N] pessoa(s) resgatada(s) e conduzida(s) a local seguro. Sem vítimas. Encaminhadas ao [ABRIGO/FAMÍLIA]."],
+ "Resgate de vítima arrastada por correnteza":["Vítima resgatada e encaminhada [HOSPITAL] [AMBULÂNCIA].","Vítima resgatada sem ferimentos e entregue à família."],
+ "Enchente":["Situação verificada; [N] família(s) orientada(s)/retirada(s). Defesa Civil municipal informada. Sem vítimas.","Água fora da área de risco para moradias; local monitorado."],
+ "Inundação":["Situação verificada; [N] família(s) orientada(s)/retirada(s). Defesa Civil municipal informada. Sem vítimas.","Água fora da área de risco para moradias; local monitorado."],
+ "Alagamento":["Situação verificada; [N] família(s) orientada(s). Defesa Civil municipal informada. Sem vítimas.","Água fora da área de risco para moradias; local monitorado."],
+ "Deslizamento de terra":["Local isolado e sinalizado. Famílias retiradas por precaução. Defesa Civil informada. Sem vítimas.","Vítima retirada dos escombros e encaminhada [HOSPITAL] [AMBULÂNCIA]."],
+ "Vendaval":["Imóvel isolado; moradores orientados. Defesa Civil informada. Sem vítimas.","[N] vítima(s) encaminhada(s) [HOSPITAL] [AMBULÂNCIA]. Área isolada."],
+ "Queda de árvore":["Árvore removida/seccionada e via desobstruída [VIATURA]. Sem vítimas.","Área isolada e sinalizada. Remoção aguarda [PREFEITURA/CONCESSIONÁRIA DE ENERGIA]. Sem vítimas."],
+ "Corte ou poda de árvore em risco":["Árvore cortada/podada e risco eliminado [VIATURA]. Material deixado com o responsável.","Risco avaliado; serviço não cabe ao CBMPA. Responsável orientado a acionar [PREFEITURA/CONCESSIONÁRIA]."],
+ "Colapso estrutural de edificação":["Imóvel isolado; moradores retirados e orientados. Defesa Civil informada. Sem vítimas.","[N] vítima(s) encaminhada(s) [HOSPITAL] [AMBULÂNCIA]. Área isolada."],
+ "Monitoramento de área de risco":["Área monitorada; sem alterações. Guarnição retornou ao quartel."],
+ "Abastecimento de água":["[N] litros distribuídos em [LOCAL/COMUNIDADE] [VIATURA]. Atendimento concluído."],
+ "Vazamento de combustível":["Vazamento contido e área isolada [VIATURA]. Material recolhido por [EMPRESA/RESPONSÁVEL]. Sem vítimas.","Vazamento controlado com [ABSORVENTE/BARREIRA]. Órgão ambiental informado."],
+ "Vazamento de produto químico":["Vazamento contido e área isolada [VIATURA]. Material recolhido por [EMPRESA/RESPONSÁVEL]. Sem vítimas.","Área evacuada e isolada. [N] pessoa(s) com sintomas encaminhada(s) [HOSPITAL] [AMBULÂNCIA]."],
+ "Acidente com carga perigosa":["Situação controlada e área isolada [VIATURA]. Material recolhido por [EMPRESA/RESPONSÁVEL]. Sem vítimas.","[N] pessoa(s) com sintomas encaminhada(s) [HOSPITAL] [AMBULÂNCIA]. Área isolada."],
+ "Derramamento de substância tóxica":["Derramamento contido e área isolada [VIATURA]. Material recolhido por [EMPRESA/RESPONSÁVEL]. Sem vítimas.","Área evacuada e isolada. [N] pessoa(s) com sintomas encaminhada(s) [HOSPITAL] [AMBULÂNCIA]."],
+ "Emergência ambiental":["Situação controlada [VIATURA]. Órgão ambiental informado. Sem vítimas."],
+ "Captura de serpente":["Serpente capturada [VIATURA] ([ESPÉCIE, SE SOUBER]) e solta em área de mata distante de residências.","Serpente capturada e entregue ao [ÓRGÃO AMBIENTAL/PROJETO] [VIATURA]. Sem vítimas.","Serpente não localizada após buscas. Morador orientado sobre medidas de prevenção."],
+ "Captura de jacaré":["Jacaré capturado e solto em [LOCAL]/entregue ao órgão ambiental [VIATURA]. Sem vítimas."],
+ "Captura de morcego":["Morcego capturado e solto em área adequada [VIATURA]. Moradores orientados sobre prevenção.","Morcego não localizado. Morador orientado a procurar a vigilância sanitária em caso de contato."],
+ "Remoção de enxame de abelhas":["Enxame removido e destinado a [LOCAL/APICULTOR] [VIATURA]. [N] pessoa(s) picada(s) atendida(s) no local.","Serviço não realizado por [MOTIVO]; responsável orientado a acionar [QUEM]."],
+ "Remoção de marimbondos ou vespas":["Ninho removido [VIATURA]. [N] pessoa(s) picada(s) atendida(s) no local.","Serviço não realizado por [MOTIVO]; responsável orientado a acionar [QUEM]."],
+ "Captura de insetos":["Insetos removidos [VIATURA]. Local orientado."],
+ "Resgate de animal silvestre":["Animal capturado e solto em [LOCAL]/entregue ao órgão ambiental [VIATURA]."],
+ "Animal preso em local de risco":["Animal resgatado [VIATURA] em segurança e entregue ao tutor.","Animal resgatado e entregue ao [CENTRO DE ZOONOSES/PROTETOR]."],
+ "Captura de animal doméstico":["Animal capturado e entregue ao tutor [VIATURA].","Animal capturado e entregue ao [CENTRO DE ZOONOSES/PROTETOR]."],
+ "Apoio em operação policial":["Apoio prestado ao [ÓRGÃO] [VIATURA]. Sem intercorrências. Guarnição retornou."],
+ "Iluminação de área de operação":["Iluminação mantida até o fim da operação, às [HORA]. Guarnição retornou."],
+ "Busca e localização de vítima":["Vítima localizada e entregue à equipe de saúde/família.","Buscas sem localizar a vítima; [QUEM] acionado para continuidade."],
+ "Ocorrência com múltiplas vítimas":["[N] vítima(s) atendida(s); [N] encaminhada(s) [HOSPITAL] [AMBULÂNCIA]; [N] óbito(s) constatado(s). [ÓRGÃOS] presentes."],
+ "Interdição e isolamento de área perigosa":["Área isolada e sinalizada [VIATURA]. Responsável/[ÓRGÃO] informado. Sem vítimas."],
+ "Apoio a outros órgãos":["Apoio prestado ao [ÓRGÃO] [VIATURA]. Atendimento concluído sem intercorrências."],
+ "Vistoria técnica de edificação":["Vistoria realizada em [LOCAL]. [Sem irregularidades / Irregularidades apontadas: ...]. Responsável orientado."],
+ "Fiscalização de sistema contra incêndio":["Fiscalização realizada em [LOCAL]. [Sem irregularidades / Irregularidades apontadas: ...]. Responsável orientado."],
+ "Análise de projeto de prevenção":["Análise concluída. [Aprovado / Pendências comunicadas ao responsável]."],
+ "Emissão de laudo ou parecer técnico":["Laudo/parecer emitido. [Aprovado / Pendências comunicadas ao responsável]."],
+ "Orientação preventiva à população":["Orientações realizadas a aproximadamente [N] pessoas. Atividade concluída sem intercorrências."],
+ "Prevenção em evento":["Orientações realizadas a aproximadamente [N] pessoas. Atividade concluída sem intercorrências."],
+ "Ocorrência não confirmada":["Guarnição foi ao local, não confirmou a ocorrência e retornou ao quartel.","Solicitante não localizado no endereço informado. Guarnição retornou."],
+ "Trote":["Constatado trote. Nenhuma ocorrência no local. Guarnição retornou."]};
+/* viaturas da ocorrência: "pela ABT-43" / "pelas ABT-43 e UR-119" */
+function viaturaTxt(r){const v=grupo(r).map(x=>x.vtr).filter(Boolean);return !v.length?"":v.length===1?`pela ${v[0]}`:`pelas ${v.slice(0,-1).join(", ")} e ${v[v.length-1]}`}
+const preencheSug=(txt,r)=>txt.replace(/\[VIATURA\]/g,viaturaTxt(r)||"[VIATURA]").replace(/\[AMBULÂNCIA\]/g,`pela ${vtrAmbulancia()}`);
+/* coloca a frase no campo sem apagar o que a pessoa já escreveu */
+function inserirDesf(inp,txt){txt=txt.toUpperCase();const at=inp.value.trim(),ult=inp._sug;
+  inp.value=(!at||at===ult)?txt:at+" "+txt;inp._sug=inp.value===txt?txt:null;
+  inp.dispatchEvent(new Event("input",{bubbles:true}));inp.focus();const m=inp.value.match(/\[[^\]]*\]/);if(m)inp.setSelectionRange(m.index,m.index+m[0].length)}
+function sugHTML(r,i){const o=ocGet(r,i),L=DESF_PADRAO[o.tipo]||[],chip=x=>`<button type="button" class="chip-s" data-sugt="${esc(x)}">${esc(preencheSug(x,r))}</button>`;
+  return `<div class="sug"><span class="sug-t">${L.length?`Sugestões para <b>${esc(o.tipo)}</b>`:"Sugestões"} · toque para usar; pode editar tudo</span>
+    ${L.length?`<div class="sug-l">${L.map(chip).join("")}</div>`:""}
+    <details class="sug-mais" ${L.length?"":"open"}><summary>Outras frases</summary><div class="sug-l">${DESF_CURINGA.map(chip).join("")}</div></details>
+    <div class="sug-h"><span>Hospital:</span>${hospitais().map(h=>`<button type="button" class="chip-h" data-hosp="${esc(h)}">${esc(hospCurto(h))}</button>`).join("")}</div></div>`}
+function ligaSugestoes(L){
+  L.querySelectorAll("[data-sugt]").forEach(b=>b.onclick=()=>{const el=b.closest(".mm"),r=S.vtrs.find(x=>x.id===el.dataset.id);inserirDesf(el.querySelector("[data-desf]"),preencheSug(b.dataset.sugt,r))});
+  L.querySelectorAll("[data-hosp]").forEach(b=>b.onclick=()=>{const el=b.closest(".mm"),inp=el.querySelector("[data-desf]"),H=b.dataset.hosp.toUpperCase();
+    inp.value=inp.value.includes("[HOSPITAL]")?inp.value.replace("[HOSPITAL]",H):(inp.value.trim()?inp.value.trim()+" ":"")+`VÍTIMA ENCAMINHADA ${H} PELA ${vtrAmbulancia().toUpperCase()}.`;
+    inp._sug=null;inp.dispatchEvent(new Event("input",{bubbles:true}));inp.focus()})}
 /* mensagem só do desfecho: curta, com o tipo e o número da ocorrência para identificar de qual é */
 function desfechoTexto(r,i){i=i||0;const o=ocGet(r,i),des=String(o.desfecho||"").trim();if(!des)return "";
   return `🚒 *9º GBM · ALTAMIRA*\n*${(mmVal(r,"tipo",i)||"OCORRÊNCIA").toUpperCase()}* · ${num2(o.num)}\n✅ ${des.toUpperCase()}`}
-function atualizaDes(el,r,i){const tx=desfechoTexto(r,i),bx=el.querySelector("[data-desfbox]");if(!bx)return;bx.hidden=!tx;const p=bx.querySelector("[data-pre-d]");if(p)p.textContent=tx;const wa=bx.querySelector("[data-wa-d]");if(wa)wa.href=waLink(tx||" ")}
+function atualizaDes(el,r,i){const tx=desfechoTexto(r,i),bx=el.querySelector("[data-desfbox]");if(!bx)return;bx.hidden=!tx;const p=bx.querySelector("[data-pre-d]");if(p)p.textContent=tx;const av=bx.querySelector("[data-aviso]");if(av)av.hidden=!/\[[^\]]+\]/.test(tx);const wa=bx.querySelector("[data-wa-d]");if(wa)wa.href=waLink(tx||" ")}
 const GU_NOME={incendio:"Guarnição de incêndio",resgate:"Guarnição de resgate",salvamento:"Guarnição de salvamento"};
 function mmGuarnicoes(r,i){const m=mmGet(r,i||0),G=grupo(r);
   const bloco=(tit,itens)=>`👥 *${tit}*\n`+itens.map(i=>`• ${i}`).join("\n");
@@ -1405,8 +1543,8 @@ function renderMM(){const L=$("#mmList");const itens=mmItens();let pgs=gruposPes
     <div class="mm-h"><b>${esc(grupo(r).map(x=>x.vtr||"VTR").join(" + "))} · ${esc(r.saida||"--:--")}${O.length>1?` · ocorrência ${i+1}/${O.length}`:""}</b><div class="row"><a class="btn small" data-wa target="_blank" rel="noopener" href="${waLink(mmTexto(r,i))}">WhatsApp</a><button class="btn small" data-share>Compartilhar</button><button class="btn small primary" data-copy>Copiar</button></div></div>
     <pre data-pre>${esc(mmTexto(r,i))}</pre>
     <div class="mm-f">
-      <div class="f"><label for="d_${sid}">Desfecho da ocorrência nº ${num2(o.num)} <small style="font-weight:600;text-transform:none;letter-spacing:0">(escreva depois: gera uma mensagem só do desfecho, sem repetir a ocorrência)</small></label><input class="in" id="d_${sid}" data-desf autocapitalize="characters" autocomplete="off" placeholder="Ex.: VÍTIMA ENCAMINHADA AO HOSPITAL REGIONAL. SEM OUTRAS INTERCORRÊNCIAS." value="${esc(o.desfecho||"")}"></div>
-      <div class="desf" data-desfbox ${desfechoTexto(r,i)?"":"hidden"}><div class="mm-h"><b>Mensagem do desfecho · nº ${num2(o.num)}</b><div class="row"><a class="btn small" data-wa-d target="_blank" rel="noopener" href="${waLink(desfechoTexto(r,i)||" ")}">WhatsApp</a><button class="btn small" data-share-d>Compartilhar</button><button class="btn small primary" data-copy-d>Copiar</button></div></div><pre data-pre-d>${esc(desfechoTexto(r,i))}</pre></div>
+      <div class="f"><label for="d_${sid}">Desfecho da ocorrência nº ${num2(o.num)} <small style="font-weight:600;text-transform:none;letter-spacing:0">(escreva depois: gera uma mensagem só do desfecho, sem repetir a ocorrência)</small></label><input class="in" id="d_${sid}" data-desf autocapitalize="characters" autocomplete="off" placeholder="Ex.: VÍTIMA ENCAMINHADA AO HOSPITAL REGIONAL. SEM OUTRAS INTERCORRÊNCIAS." value="${esc(o.desfecho||"")}"></div>${sugHTML(r,i)}
+      <div class="desf" data-desfbox ${desfechoTexto(r,i)?"":"hidden"}><div class="mm-h"><b>Mensagem do desfecho · nº ${num2(o.num)}</b><div class="row"><a class="btn small" data-wa-d target="_blank" rel="noopener" href="${waLink(desfechoTexto(r,i)||" ")}">WhatsApp</a><button class="btn small" data-share-d>Compartilhar</button><button class="btn small primary" data-copy-d>Copiar</button></div></div><pre data-pre-d>${esc(desfechoTexto(r,i))}</pre><div class="desf-aviso" data-aviso ${/\[[^\]]+\]/.test(desfechoTexto(r,i))?"":"hidden"}>⚠ Falta completar o que está entre [colchetes] antes de enviar.</div></div>
       <div class="f"><label for="o_${sid}">Observações</label><input class="in" id="o_${sid}" data-mm="obs" autocapitalize="characters" value="${esc(m.obs)}"></div>
       <details><summary>Ajustar o texto só no minuto a minuto</summary><div class="grid" style="margin-top:10px">
       ${MM_SYNC.map(k=>`<div class="f ${["endereco","coord","guarnicao","destino","tipo"].includes(k)?"full":""}"><label for="mv_${k}_${sid}">${MM_LBL[k]}</label>
@@ -1418,7 +1556,7 @@ function renderMM(){const L=$("#mmList");const itens=mmItens();let pgs=gruposPes
     <pre data-pre>${esc(pesTexto(g))}</pre>
     <div class="mm-f"><div class="f"><label for="po_${r.id}">Observações</label><input class="in" id="po_${r.id}" data-pobs autocapitalize="characters" autocomplete="off" value="${esc(r.obs||"")}"></div></div></article>`};
   L.innerHTML=guCard+itens.map(art).join("")+(pgs.length?`<h3 class="mmsec">Entrada de militares e civis</h3>`+pgs.map(artP).join(""):"");
-  ligaGu();
+  ligaGu();ligaSugestoes(L);
   if(itens.length>1){const o=document.createElement("div");o.className="resumo";o.innerHTML=ordemBtn();L.insertBefore(o,L.children[1]||null);ligaOrdem(L,renderMM)}
   if(mmAlvo){const alvo=L.querySelector(`.mm[data-id="${CSS.escape(grupo(S.vtrs.find(x=>x.id===mmAlvo)||{id:mmAlvo})[0]?.id||mmAlvo)}"][data-oi="0"]`);mmAlvo=null;
     if(alvo)setTimeout(()=>{alvo.scrollIntoView({behavior:"smooth",block:"start"});alvo.classList.add("pisca");setTimeout(()=>alvo.classList.remove("pisca"),1800)},60)}
@@ -1780,13 +1918,15 @@ $("#cfgBtn").onclick=configuracoes;
 function editaListas(){
   openModal(`<header><h3>Efetivo e viaturas</h3><button class="btn primary small" id="lSave">Salvar</button></header><div class="body">
    <p class="note">Um por linha, do jeito que deve aparecer na folha. Nomes digitados fora da lista continuam aceitos nos lançamentos.</p>
+   <div class="f"><label for="lAmb">Viatura de transporte de vítimas (ambulância)</label><input class="in" id="lAmb" value="${esc(vtrAmbulancia())}" autocapitalize="characters"><span class="hint">Entra sozinha nos desfechos que falam de encaminhar vítima ao hospital. Pode ser trocada em cada desfecho.</span></div>
+   <div class="f"><label for="lHosp">Hospitais, do jeito que entram na frase</label><textarea class="in" id="lHosp" style="min-height:90px">${esc(hospitais().join("\n"))}</textarea><span class="hint">Um por linha. Ex.: “ao Hospital Regional de Altamira”, “à UPA”.</span></div>
    <div class="f"><label for="lVtr">Viaturas</label><textarea class="in" id="lVtr" style="min-height:120px">${esc(viaturas().join("\n"))}</textarea></div>
    <div class="f"><label>Guarnição de cada viatura</label><div class="grid" id="lMap">${viaturas().map(v=>`<div class="f"><label for="lm_${esc(v)}">${esc(v)}</label><select class="in" id="lm_${esc(v)}" data-vtr="${esc(v)}"><option value="">—</option>${Object.entries(GU_TIPOS).map(([k,n])=>`<option value="${k}" ${vtrGu(v)===k?"selected":""}>${n}</option>`).join("")}</select><label class="check" style="font-size:13px"><input type="checkbox" data-cond="${esc(v)}" ${usaCondOp(v)?"checked":""}> conduzida pelo condutor/operador do dia</label></div>`).join("")}</div><span class="hint">Só as viaturas marcadas puxam o “condutor e operador de viatura” da guarnição do dia. Nas outras o condutor fica em branco para você escolher.</span></div>
    <div class="f"><label for="lEf">Efetivo</label><textarea class="in" id="lEf" style="min-height:45vh">${esc(efetivo().join("\n"))}</textarea></div>
    <button class="btn danger" id="lReset" style="align-self:flex-start">Voltar às listas originais</button></div>`);
   const ls=id=>[...new Set($(id).value.split("\n").map(limpaNome).filter(Boolean))];
-  $("#lSave").onclick=()=>{meta.efetivo=ls("#lEf");meta.viaturas=ls("#lVtr");meta.vtrGu={};box.querySelectorAll("[data-vtr]").forEach(s=>{meta.vtrGu[s.dataset.vtr]=s.value});meta.vtrCond={};box.querySelectorAll("[data-cond]").forEach(c=>{if(c.checked)meta.vtrCond[normVtr(c.dataset.cond)]=true});saveMeta();closeModal();toast("Listas salvas.")};
-  $("#lReset").onclick=()=>ask("Voltar o efetivo e as viaturas para as listas originais?","Voltar",()=>{meta.efetivo=EFETIVO_PADRAO.length?[...EFETIVO_PADRAO]:null;meta.viaturas=VTRS_PADRAO.length?[...VTRS_PADRAO]:null;meta.vtrGu=Object.keys(VTR_GU_PADRAO).length?Object.assign({},VTR_GU_PADRAO):null;meta.vtrCond={};CONDOP_PADRAO.forEach(v=>meta.vtrCond[v]=true);saveMeta();toast("Listas originais restauradas.")})}
+  $("#lSave").onclick=()=>{meta.vtrAmb=limpaNome($("#lAmb").value)||null;meta.hospitais=$("#lHosp").value.split("\n").map(x=>x.trim()).filter(Boolean);if(!meta.hospitais.length)meta.hospitais=null;meta.efetivo=ls("#lEf");meta.viaturas=ls("#lVtr");meta.vtrGu={};box.querySelectorAll("[data-vtr]").forEach(s=>{meta.vtrGu[s.dataset.vtr]=s.value});meta.vtrCond={};box.querySelectorAll("[data-cond]").forEach(c=>{if(c.checked)meta.vtrCond[normVtr(c.dataset.cond)]=true});saveMeta();closeModal();toast("Listas salvas.")};
+  $("#lReset").onclick=()=>ask("Voltar o efetivo e as viaturas para as listas originais?","Voltar",()=>{meta.efetivo=EFETIVO_PADRAO.length?[...EFETIVO_PADRAO]:null;meta.viaturas=VTRS_PADRAO.length?[...VTRS_PADRAO]:null;meta.vtrGu=Object.keys(VTR_GU_PADRAO).length?Object.assign({},VTR_GU_PADRAO):null;meta.vtrCond={};CONDOP_PADRAO.forEach(v=>meta.vtrCond[v]=true);meta.vtrAmb=null;meta.hospitais=null;saveMeta();toast("Listas originais restauradas.")})}
 
 /* ---------- salvamento e backup ---------- */
 function baixar(nome,txt){const blob=new Blob([txt],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
