@@ -62,4 +62,8 @@ SENHA
 COMO COLOCAR NO AR (quem publica o aplicativo)
 Envie o conteúdo de dist/ para o MESMO endereço de sempre (GitHub Pages, Netlify, Cloudflare Pages).
 Não troque de endereço depois de começar a usar: os dados ficam ligados ao endereço.
-Ao publicar mudança, aumente VERSAO em sw.js (juntada-v15 -> juntada-v16).
+Ao publicar mudança, aumente VERSAO em sw.js (juntada-v19 -> juntada-v20).
+
+AUTORIA E LICENÇA
+Aplicativo criado por Matheus Henrique da Cruz Carvalho (SD QBM), 9º GBM Altamira — CBMPA. © 2026.
+Uso conforme o arquivo LICENSE.txt. Veja também Configurações > Este computador > Sobre o aplicativo.

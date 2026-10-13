@@ -1,5 +1,5 @@
-// Juntada 9º GBM — funciona sem internet depois da primeira abertura.
-const VERSAO = "juntada-v17";
+// Juntada 9º GBM — © 2026 Matheus Henrique da Cruz Carvalho (mhcc.2026.jgbm9.7c41e0b9d2) — funciona sem internet depois da primeira abertura.
+const VERSAO = "juntada-v19";
 const APP = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

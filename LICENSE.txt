@@ -1,0 +1,37 @@
+LICENÇA DE USO — JUNTADA 9º GBM ALTAMIRA
+=========================================
+
+Copyright © 2026 Matheus Henrique da Cruz Carvalho (SD QBM),
+9º Grupamento Bombeiro Militar de Altamira — Corpo de Bombeiros Militar do Pará.
+Registro de autoria no código: JGBM9-MHCC-2026-A7F3-91D4
+
+Todos os direitos reservados, exceto o que esta licença permite expressamente.
+
+1. USO PERMITIDO E GRATUITO
+   O aplicativo e o código-fonte podem ser usados, para fins operacionais e institucionais, no Corpo
+   de Bombeiros Militar do Pará (CBMPA), sem qualquer pagamento ao autor. O autor não requer
+   remuneração: requer apenas o reconhecimento da sua autoria.
+
+2. CÓPIA, ADAPTAÇÃO E INCORPORAÇÃO
+   São permitidas cópias, adaptações e a incorporação a sistemas do CBMPA (inclusive pela DTIC), desde que:
+   a) sejam mantidos o nome do autor e este aviso de direitos autorais: no cabeçalho do código,
+      na tela "Sobre" (Configurações > Este computador), nos metadados do aplicativo e nos PDFs;
+   b) toda versão modificada informe que é uma versão modificada e quem a modificou, sem
+      apresentar a alteração como obra original.
+
+3. NÃO É PERMITIDO, SEM AUTORIZAÇÃO ESCRITA DO AUTOR
+   a) remover, ocultar ou alterar o crédito de autoria;
+   b) apresentar o aplicativo, ou parte dele, como criação de outra pessoa;
+   c) vender, sublicenciar ou explorar comercialmente o aplicativo;
+   d) distribuir o aplicativo ou o código-fonte fora do CBMPA.
+
+4. SEM GARANTIA
+   O aplicativo é fornecido "no estado em que se encontra", sem garantia de qualquer espécie.
+   O autor não responde por danos decorrentes do uso. A guarda e a proteção dos dados lançados
+   (militares, civis, ocorrências) são de responsabilidade da unidade que usa o aplicativo.
+
+5. AUTORIA E TITULARIDADE
+   O reconhecimento da autoria é perpétuo e deve constar em qualquer versão do aplicativo.
+   Esta licença não transfere a titularidade da obra; qualquer outro arranjo exige instrumento próprio, por escrito.
+
+Dúvidas e pedidos de autorização: Matheus Henrique da Cruz Carvalho — SD QBM, 9º GBM Altamira.
