@@ -163,6 +163,8 @@ a.btn{text-decoration:none;color:inherit}
 .vrow>.vst{min-width:0}.revg{margin-left:auto;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.pendb{margin:12px 0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);border-radius:12px;background:var(--surface)}
 .pendb.ok{border-color:color-mix(in srgb,var(--ok) 45%,transparent);color:var(--ok)}
 .pendb .pg{margin-top:8px}.pendb .pk{font-weight:800;color:var(--warn);font-size:13px}.pendb ul{margin:4px 0 0;padding-left:20px;font-size:13px}
+@keyframes pisca{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 4px var(--warn);background:color-mix(in srgb,var(--warn) 18%,var(--surface))}}
+.pisca{animation:pisca .7s ease-in-out 5}
 .pendlk{background:none;border:0;padding:2px 0;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left}
 .hacha{display:block;margin-top:4px;font-size:12.5px;color:var(--muted)}.hacha b{color:inherit}
 .revcopy{padding:5px 8px;display:inline-flex;align-items:center}
@@ -1105,7 +1107,9 @@ modal.addEventListener("click",e=>{const fundo=e.target===modal&&mdFundo;mdFundo
 document.addEventListener("keydown",e=>{if(e.key!=="Escape"||modal.hidden)return;if(typeof dd!=="undefined"&&!dd.hidden){acHide();return}if(modalFixo)return;closeModal()});
 function ask(msg,okTxt,fn){openModal(`<div class="confirm"><p>${msg}</p><div class="row" style="justify-content:flex-end"><button class="btn" data-x>Cancelar</button><button class="btn primary" data-ok>${okTxt}</button></div></div>`);
   box.querySelector("[data-x]").onclick=closeModal;box.querySelector("[data-ok]").onclick=()=>{onClose=null;modal.hidden=true;fn();renderAll()}}
-async function copiar(txt){try{await navigator.clipboard.writeText(txt);toast("Copiado. É só colar no WhatsApp.");return}catch(e){}
+async function copiar(txt,msg){const ok=msg||"Copiado. É só colar no WhatsApp.";try{await navigator.clipboard.writeText(txt);toast(ok);return}catch(e){}
+  /* plano B: copia por um campo escondido, sem abrir nenhuma janela */
+  try{const t=document.createElement("textarea");t.value=txt;t.setAttribute("readonly","");t.style.cssText="position:fixed;left:-9999px;top:0;opacity:0";document.body.append(t);t.select();const c=document.execCommand("copy");t.remove();if(c){toast(ok);return}}catch(e){}
   openModal(`<header><h3>Copiar texto</h3><button class="btn ghost" data-x>Fechar</button></header><div class="body"><p class="note">Toque no texto, selecione tudo e copie.</p><textarea class="in" style="min-height:50vh" readonly>${esc(txt)}</textarea></div>`);
   box.querySelector("[data-x]").onclick=closeModal;const ta=box.querySelector("textarea");ta.focus();ta.select()}
 
@@ -1254,7 +1258,8 @@ function desenhaPerm(){const A=$("#guPerm");if(!A)return;if(document.activeEleme
   const de=n=>P.find(p=>norm(p.entra)===norm(n));
   A.innerHTML=`<div class="permb"><span class="sug-t">Permuta · alguém está no lugar de outro militar?</span><div class="sug-g">${pess.map((n,i)=>{const p=de(n);
     return p?`<span class="chip-k perm-on">${esc(n)} ⇄ em lugar de ${esc(p.sai)} <button type="button" class="chip-x" data-permx="${esc(p.id)}" title="Desfazer a permuta" aria-label="Desfazer a permuta">×</button></span>`:`<button type="button" class="chip-h" data-perm="${i}">${esc(n)} · permuta</button>`}).join("")}</div>
-    ${permAb!==null&&pess[permAb]?`<div class="permf"><datalist id="dl-efetivo">${efetivo().map(n=>`<option value="${esc(n)}">`).join("")}</datalist><input class="in" id="permSai" list="dl-efetivo" autocomplete="off" placeholder="Quem foi substituído por ${esc(pess[permAb])}" aria-label="Militar substituído"><button type="button" class="btn small primary" data-permok>OK</button><button type="button" class="btn small" data-permno>Cancelar</button></div>`:""}</div>`;
+    ${permAb!==null&&pess[permAb]?`<div class="permf"><input class="in" id="permSai" data-ac="nomes" autocomplete="off" autocapitalize="characters" placeholder="Quem foi substituído por ${esc(pess[permAb])}" aria-label="Militar substituído"><button type="button" class="btn small primary" data-permok>OK</button><button type="button" class="btn small" data-permno>Cancelar</button></div>`:""}</div>`;
+  ligaBusca(A);const ps=A.querySelector("#permSai");if(ps)ps.addEventListener("keydown",e=>{if(e.key==="Enter"&&(dd.hidden||!ac)){e.preventDefault();const ok=A.querySelector("[data-permok]");if(ok)ok.click()}});
   A.querySelectorAll("[data-perm]").forEach(b=>b.onclick=()=>{permAb=+b.dataset.perm;desenhaPerm();const i=A.querySelector("#permSai");if(i)i.focus()});
   A.querySelectorAll("[data-permno]").forEach(b=>b.onclick=()=>{permAb=null;desenhaPerm()});
   A.querySelectorAll("[data-permok]").forEach(b=>b.onclick=()=>{const v=A.querySelector("#permSai").value.trim().toUpperCase(),n=pess[permAb];if(!v||!n){toast("Escreva quem foi substituído.");return}
@@ -1285,7 +1290,9 @@ const maisAntigo=l=>{let b="",bi=0;l.forEach(n=>{if(!n)return;const i=antig(n);i
 const ehResgate=r=>(r.gus||[])[0]==="resgate"||(!(r.gus||[]).length&&vtrGu(r.vtr)==="resgate");
 /* CMT / Socorrista: se ficou em branco (e não foi digitado à mão), vai o mais antigo de quem está na viatura.
    Resgate: o mais antigo entre os socorristas (o condutor, em geral sargento, não entra). Outras viaturas: o mais antigo de todos, mesmo sendo o condutor. */
-function autoCmt(r){if(r._cmtManual||(r.cmt&&!r._cmtAuto))return false;
+/* viatura de combate a incêndio: o CMT/socorrista NÃO entra sozinho (escolhido à mão, pelas sugestões ou digitando) */
+const ehIncendio=r=>(r.gus||[])[0]==="incendio"||(!(r.gus||[]).length&&vtrGu(r.vtr)==="incendio");
+function autoCmt(r){if(r._cmtManual||(r.cmt&&!r._cmtAuto)||ehIncendio(r))return false;
   const res=ehResgate(r),nc=norm(r.condutor||""),velho=r.cmt||"",comp=linhas(r.guarnicao);
   const pool=[...(res?[]:[r.condutor]),velho,...comp].filter(Boolean),cand=pool.length?pool:[r.condutor].filter(Boolean);if(!cand.length)return false;
   const m=maisAntigo(cand),vis=new Set([norm(m)]),resto=[];
@@ -1306,11 +1313,23 @@ function montaGu(r,gus){const g=gu(),s=linhas(g.socorristas),antes=(r.gus||[])[0
   mantem.concat(auto).forEach(n=>{const k=norm(n);if(n&&!usados.has(k)){usados.add(k);out.push(n)}});
   r.condutor=cond;r.guarnicao=out.join(String.fromCharCode(10));r.gus=gus;autoCmt(r)}
 /* sugestão da guarnição de serviço (incêndio e salvamento): quem ainda não está na viatura */
-function sugEquipe(r){const gs=(r.gus||[]).filter(t=>t!=="resgate"),g=gu();if(!gs.length)return [];
+/* Aparecem: Cmt de Socorro e Adjunto (sempre que a viatura tem tipo de guarnição) + condutor + componentes só dos tipos marcados
+   (marcou incêndio: não aparece o pessoal da resgate, e vice-versa) */
+function sugEquipe(r){const gs=r.gus||[],g=gu();if(!gs.length)return [];
   const dentro=new Set([r.condutor,r.cmt,...linhas(r.guarnicao)].filter(Boolean).map(norm)),vis=new Set(),out=[];
-  gs.forEach(t=>membros(t,r).forEach(n=>{const k=norm(n);if(!n||dentro.has(k)||vis.has(k))return;vis.add(k);out.push({n,cond:t==="incendio"&&usaCondOp(r.vtr)&&norm(g.condOp)===k})}));return out}
-/* coloca um nome sugerido na viatura: condutor (se for o condutor da sugestão e estiver vazio) ou componente */
-function poeSug(r,item){if(item.cond&&!String(r.condutor||"").trim())r.condutor=item.n;else{const l=linhas(r.guarnicao);if(!l.some(x=>norm(x)===norm(item.n))&&norm(r.condutor)!==norm(item.n))l.push(item.n);r.guarnicao=l.join(String.fromCharCode(10))}}
+  const add=(n,papel)=>{n=String(n||"").trim();const k=norm(n);if(!n||dentro.has(k)||vis.has(k))return;vis.add(k);out.push({n,papel,cond:papel==="cond"})};
+  add(g.cmt,"cmt");add(g.adj,"adj");
+  gs.forEach(t=>{if(t==="resgate"){add(g.condRes,"cond");linhas(g.socorristas).forEach(n=>add(n))}
+    else if(t==="incendio"){if(usaCondOp(r.vtr))add(g.condOp,"cond");linhas(g.incendio).forEach(n=>add(n))}
+    else linhas(g.salvamento).forEach(n=>add(n))});
+  return out}
+/* coloca um nome sugerido na viatura: condutor, CMT/socorrista ou componente */
+function poeSug(r,item){const nl=String.fromCharCode(10),l=linhas(r.guarnicao);
+  if(item.papel==="cond"&&!String(r.condutor||"").trim()){r.condutor=item.n;return}
+  if((item.papel==="cmt"||item.papel==="adj")){
+    if(!String(r.cmt||"").trim()){r.cmt=item.n;r._cmtManual=true;r._cmtAuto=false;return}
+    if(r._cmtAuto&&norm(r.cmt)!==norm(item.n)){if(!l.some(x=>norm(x)===norm(r.cmt)))l.push(r.cmt);r.cmt=item.n;r._cmtManual=true;r._cmtAuto=false;r.guarnicao=l.filter(x=>norm(x)!==norm(item.n)).join(nl);return}}
+  if(!l.some(x=>norm(x)===norm(item.n))&&norm(r.condutor)!==norm(item.n)&&norm(r.cmt)!==norm(item.n))l.push(item.n);r.guarnicao=l.join(nl)}
 /* quem está de sentinela num horário, pelo mapa de ronda */
 function sentinelaEm(hm,antes){const t=toMin(hm);if(t===null)return "";const m=[];
   for(const q of ordenaRonda(S.ronda||[])){const a=toMin(q.inicio),b=toMin(q.termino);if(a===null||b===null||!q.sentinela)continue;
@@ -1507,7 +1526,7 @@ function editorSaida(id){
     box.querySelectorAll("[data-gus]").forEach(b=>b.setAttribute("aria-pressed",String((r.gus||[]).includes(b.dataset.gus))));desenhaSug()};
   /* incêndio e salvamento: a guarnição do dia aparece como sugestão (toque para colocar na viatura), não entra sozinha */
   function desenhaSug(){const A=$$("#sdSug");if(!A)return;const L=sugEquipe(r);
-    A.innerHTML=L.length?`<div class="sugeq"><span class="sug-t">Guarnição de serviço · sugestão. Toque em quem saiu nesta viatura</span><div class="sug-g">${L.map((x,i)=>`<button type="button" class="chip-k" data-sugeq="${i}">${esc(x.n)}${x.cond?" · condutor":""}</button>`).join("")}<button type="button" class="chip-h" data-sugtodos>Todos</button></div></div>`:"";
+    A.innerHTML=L.length?`<div class="sugeq"><span class="sug-t">Guarnição de serviço · sugestão. Toque em quem saiu nesta viatura</span><div class="sug-g">${L.map((x,i)=>`<button type="button" class="chip-k" data-sugeq="${i}">${esc(x.n)}${x.cond?" · condutor":x.papel==="cmt"?" · Cmt de Socorro":x.papel==="adj"?" · Adjunto":""}</button>`).join("")}<button type="button" class="chip-h" data-sugtodos>Todos</button></div></div>`:"";
     const ap=its=>{its.forEach(x=>poeSug(r,x));autoCmt(r);mostraEquipe();syncGrupo(r);touch()};
     A.querySelectorAll("[data-sugeq]").forEach(b=>b.onclick=()=>ap([L[+b.dataset.sugeq]]));
     const t=A.querySelector("[data-sugtodos]");if(t)t.onclick=()=>ap(L)}
@@ -1706,7 +1725,7 @@ function renderVtr(){const L=$("#vtrList");const arr=ordena(S.vtrs,"saida");rend
       <label class="rev ${x.revisa?"feito":""}"><input type="checkbox" data-rev="${x.id}" ${x.revisa?"checked":""}><span>REVISA</span></label></span></div>`).join("")}</div></div>`}).join("");
   ligaOrdem(L,renderVtr);
   L.querySelectorAll("[data-revall]").forEach(b=>b.onclick=e=>{e.stopPropagation();const P=arr.filter(r=>!r.revisa);if(!P.length){toast("Todas as saídas já estão com REVISA.");return}
-    const nl=String.fromCharCode(10);copiar(P.map(textoRevisa).join(nl+nl))});
+    const nl=String.fromCharCode(10);copiar(P.map(textoRevisa).join(nl+nl),P.length>1?"Itens copiados para a área de transferência.":"Item copiado para a área de transferência.")});
   L.querySelectorAll("[data-gomm]").forEach(b=>b.onclick=e=>{e.stopPropagation();vaiMM(b.dataset.gomm)});
   L.querySelectorAll("[data-chegou]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=S.vtrs.find(v=>v.id===b.dataset.chegou);x.chegada=nowHM();focoHodo=x.id;touch();flush();renderVtr();toast(`${x.vtr||"Viatura"} chegou às ${x.chegada}. Digite o hodômetro de chegada.`)});
   /* campos rápidos direto no cartão: nº do BO (de cada ocorrência) e hodômetros */
@@ -1723,7 +1742,7 @@ function renderVtr(){const L=$("#vtrList");const arr=ordena(S.vtrs,"saida");rend
     inp.addEventListener("change",salva)});
   if(focoHodo){const f=L.querySelector(`.inl[data-inl="hodoChegada"][data-id="${CSS.escape(focoHodo)}"]`);if(f)setTimeout(()=>f.focus({preventScroll:true}),50)}
   L.querySelectorAll(".card").forEach(c=>{const abre=()=>editor("vtr",c.dataset.id);c.onclick=e=>{if(e.target.closest(".rev,.mini,.inl-wrap"))return;abre()};c.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&e.target===c){e.preventDefault();abre()}};
-    c.querySelectorAll("[data-revcopy]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=S.vtrs.find(v=>v.id===b.dataset.revcopy);if(x)copiar(textoRevisa(x))});
+    c.querySelectorAll("[data-revcopy]").forEach(b=>b.onclick=e=>{e.stopPropagation();const x=S.vtrs.find(v=>v.id===b.dataset.revcopy);if(x)copiar(textoRevisa(x),"Item copiado para a área de transferência.")});
     c.querySelectorAll("[data-rev]").forEach(cb=>cb.onchange=()=>{const x=S.vtrs.find(v=>v.id===cb.dataset.rev);x.revisa=cb.checked;touch();renderVtr()})})}
 
 /* ---------- minuto a minuto ---------- */
@@ -1756,6 +1775,7 @@ function mmTexto(r,i){i=i||0;const m=mmGet(r,i),v=k=>mmVal(r,k,i),G=ocVtrs(r,i),
   {const nm=new Set(G.flatMap(x=>[x.condutor,x.cmt,...linhas(x.guarnicao)]).map(norm).filter(Boolean)),pm=(S.permutas||[]).filter(q=>nm.has(norm(q.entra)));
    if(pm.length)B.push(pm.map(q=>`🔁 *Permuta:* ${q.entra} em lugar de ${q.sai}`).join(String.fromCharCode(10)))}
   if(m.obs.trim())B.push(`💬 *Observações*\n${m.obs.trim().toUpperCase()}`);
+  {const qra=String(r.sentinela||"").trim()||sentinelaEm(v("saida"),r.antes);if(qra)B.push(`*QRA:* ${qra.toUpperCase()}`)}/* QRA = sentinela do quarto de hora (mapa de ronda) */
   return B.join("\n\n")}
 /* mensagem só do desfecho (depois da ocorrência): traz o número, o tipo, o horário, o local e as viaturas para identificar de qual ocorrência é */
 /* ---------- sugestões de desfecho (Min a Min) ----------
@@ -1982,8 +2002,10 @@ function folha2(){const arr=ordena(S.pessoas,"entrada");const rows=arr.map(r=>`<
 /* mapa de ronda: o que não foi preenchido sai em branco (sem asteriscos), para completar à mão */
 const LINHAS_BRANCO=15;
 const celB=v=>`<td>${esc(String(v??"").trim()?String(v).toUpperCase():"")}</td>`;
-function folha3(){const rows=ordenaRonda(S.ronda).map(r=>`<tr>${celB(r.inicio)}${celB(r.termino)}${celB(r.sentinela)}<td>${esc((r.obsSent||"").toUpperCase())}</td><td></td>${celB(r.rondante)}<td>${esc((r.obsRond||"").toUpperCase())}</td><td></td></tr>`);
-  if(!rows.length)for(let i=0;i<LINHAS_BRANCO;i++)rows.push(`<tr>${"<td></td>".repeat(8)}</tr>`);
+/* rondante / obs. / assinatura do rondante: *** quando vazio; sentinela fica em branco p/ preencher à mão */
+const celA=v=>`<td>${String(v??"").trim()?esc(String(v).toUpperCase()):"***"}</td>`;
+function folha3(){const rows=ordenaRonda(S.ronda).map(r=>`<tr>${celB(r.inicio)}${celB(r.termino)}${celB(r.sentinela)}<td>${esc((r.obsSent||"").toUpperCase())}</td><td></td>${celA(r.rondante)}${celA(r.obsRond)}${celA("")}</tr>`);
+  if(!rows.length)for(let i=0;i<LINHAS_BRANCO;i++)rows.push(`<tr>${"<td></td>".repeat(5)}${celA("").repeat(3)}</tr>`);
   return `<section class="sheet">${cabecalho("MAPA DE RONDA")}<table class="sh-t ronda">${cols([5,7.1,10.4,12.2,21.2,10.4,12.2,21.5])}
   <thead><tr><th colspan="2">HORÁRIO</th><th rowspan="2">SENTINELA</th><th rowspan="2">OBSERVAÇÃO</th><th rowspan="2">ASSINATURA SENTINELA</th><th rowspan="2">RONDANTE</th><th rowspan="2">OBSERVAÇÃO</th><th rowspan="2">ASSINATURA/ RONDANTE</th></tr>
   <tr><th>Início</th><th>Término</th></tr></thead><tbody>${rows.join("")}</tbody></table>${rodape()}</section>`}
@@ -2001,8 +2023,8 @@ function pendencias(){const out=[],arr=ordena(S.vtrs,"saida"),vz=v=>!String(v||"
 function desenhaPend(){const A=$("#folPend");if(!A)return;const P=pendencias();
   if(!P.length){A.innerHTML=`<div class="pendb ok"><b>Conferência:</b> tudo preenchido. Pode imprimir.</div>`;return}
   const g={};P.forEach(p=>(g[p.t]=g[p.t]||[]).push(p));
-  A.innerHTML=`<div class="pendb"><b>Conferência antes de imprimir · ${P.length} pendência${P.length>1?"s":""}</b>${Object.keys(g).map(k=>`<div class="pg"><span class="pk">${esc(k)} (${g[k].length})</span><ul>${g[k].map(p=>`<li><button type="button" class="pendlk" data-pend="${esc(p.id)}" title="Abrir esta saída para completar">${esc(p.x)}</button></li>`).join("")}</ul></div>`).join("")}<p class="hint">Toque numa pendência para abrir a saída e completar. Dá para imprimir assim mesmo; o aplicativo só avisa. Saída que ainda não voltou fica com a chegada em branco, sem problema.</p></div>`;
-  A.querySelectorAll("[data-pend]").forEach(b=>b.onclick=()=>{const id=b.dataset.pend;if(!S.vtrs.some(r=>r.id===id))return;go("vtr");editor("vtr",id)})}
+  A.innerHTML=`<div class="pendb"><b>Conferência antes de imprimir · ${P.length} pendência${P.length>1?"s":""}</b>${Object.keys(g).map(k=>`<div class="pg"><span class="pk">${esc(k)} (${g[k].length})</span><ul>${g[k].map(p=>`<li><button type="button" class="pendlk" data-pend="${esc(p.id)}" title="Mostrar esta saída na lista">${esc(p.x)}</button></li>`).join("")}</ul></div>`).join("")}<p class="hint">Toque numa pendência para ver o cartão da saída (ele pisca) e completar. Dá para imprimir assim mesmo; o aplicativo só avisa. Saída que ainda não voltou fica com a chegada em branco, sem problema.</p></div>`;
+  A.querySelectorAll("[data-pend]").forEach(b=>b.onclick=()=>{const id=b.dataset.pend;if(!S.vtrs.some(r=>r.id===id))return;go("vtr");setTimeout(()=>{const e=document.querySelector('#v-vtr [data-id="'+id+'"]'),c=e&&e.closest(".card");if(!c)return;c.scrollIntoView({block:"center",behavior:"smooth"});c.classList.remove("pisca");void c.offsetWidth;c.classList.add("pisca");setTimeout(()=>c.classList.remove("pisca"),4000)},150)})}
 function confPend(fn){const P=pendencias();if(!P.length){fn();return}
   ask(`Ainda há ${P.length} pendência${P.length>1?"s":""} (BO, REVISA, odômetro ou guarnição). Veja a lista em “Conferência” nesta tela. Imprimir assim mesmo?`,"Sim, assim mesmo",fn)}
 function renderFol(){desenhaPend();const W=$("#prevWrap");W.innerHTML=[folha1(),folha2(),folha3()].map(h=>`<div class="prev"><div class="scaler">${h}</div></div>`).join("");scalePrev()}
@@ -2034,8 +2056,8 @@ function linhasFolhas(D){
   const f1=(D.retornos||[]).map(r=>linhaRet(r).map(v=>VA(v))).concat(ordena(D.vtrs||[],"saida").map(r=>[VA(r.vtr),VA(r.saida),VA(r.chegada),VA(r.hodoSaida),VA(r.hodoChegada),VA(kmDe(r)),VA(destinoFolha(r)),VA(r.condutor),VA(r.cmt),VA(r.sentinela),VA(boFolha(r)),VA(coordFolha(r))]));
   const f2=ordena(D.pessoas||[],"entrada").map(r=>[VA(r.nome),VA(r.doc),VA(r.orgao),VA(r.destino),VA(r.entrada),VA(r.saida),VA(r.sentinela)]);
   const VB=v=>String(v??"").trim()?String(v).toUpperCase():"";
-  const f3Lin=ordenaRonda(D.ronda||[],D).map(r=>[VB(r.inicio),VB(r.termino),VB(r.sentinela),String(r.obsSent||"").toUpperCase(),"",VB(r.rondante),String(r.obsRond||"").toUpperCase(),""]);
-  const f3=f3Lin.length?f3Lin:Array.from({length:LINHAS_BRANCO},()=>["","","","","","","",""]);
+  const f3Lin=ordenaRonda(D.ronda||[],D).map(r=>[VB(r.inicio),VB(r.termino),VB(r.sentinela),String(r.obsSent||"").toUpperCase(),"",VA(r.rondante),VA(r.obsRond),"***"]);
+  const f3=f3Lin.length?f3Lin:Array.from({length:LINHAS_BRANCO},()=>["","","","","","***","***","***"]);
   return {f1,f2,f3}}
 function pdfJuntada(D,sel,pre){sel=sel||[1,2,3];const MM=72/25.4,PH=210,pages=(pre||[]).slice();let ops;const pm=p=>p/MM;
   const X=x=>(x*MM).toFixed(2),Y=y=>((PH-y)*MM).toFixed(2),F={TR:"F1",TB:"F2",H:"F3"};
