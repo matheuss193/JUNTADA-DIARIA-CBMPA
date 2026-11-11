@@ -2620,7 +2620,7 @@ const pnlConta=(L,f)=>{const m=new Map();L.forEach(x=>{const k=f(x);if(k)m.set(k
 /* filtro de tudo; "pula" ignora um dos filtros (para o gráfico daquele filtro continuar mostrando as outras opções) */
 function pnlFiltra(L,pula){const q=pnlSemAc(PNL.q).split(" ").filter(Boolean);
   return L.filter(o=>(pula==="tipo"||!PNL.tipo||o.tipo===PNL.tipo)&&(pula==="cat"||!PNL.cat||o.cat===PNL.cat)&&(pula==="vtr"||!PNL.vtr||o.vtrs.includes(PNL.vtr))&&(pula==="bairro"||!PNL.bairro||o.bairro===PNL.bairro)&&(!q.length||q.every(t=>o._t.includes(t))))}
-const pnlPos=o=>o.coord||(PNL.aprox?o.aprox:null);
+const pnlPos=o=>(o.coord&&pnlDist(o.coord,PNL_CENTRO)<=150000?o.coord:null)||(PNL.aprox?o.aprox:null);
 const pnlDataBR=s=>s?s.split("-").reverse().join("/"):"";
 function pnlBarras(L,total,attr,sel,cor){if(!L.length)return `<span class="hint">Nada neste filtro.</span>`;
   return L.map(([k,n])=>`<button type="button" class="pnl-bar ${sel===k?"on":""}" ${attr}="${esc(k)}"><span class="pnl-bk">${cor?`<i class="pnl-dot" style="background:${cor(k)}"></i>`:""}${esc(k)}${attr==="data-pt"&&TIPO_CAT[k]?`<small>${esc(TIPO_CAT[k])}</small>`:""}</span><span class="pnl-bt"><i style="width:${Math.max(3,Math.round(100*n/Math.max(1,total)))}%${cor?";background:"+cor(k):""}"></i></span><b>${n}</b></button>`).join("")}
