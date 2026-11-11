@@ -2620,7 +2620,9 @@ const pnlConta=(L,f)=>{const m=new Map();L.forEach(x=>{const k=f(x);if(k)m.set(k
 /* filtro de tudo; "pula" ignora um dos filtros (para o gráfico daquele filtro continuar mostrando as outras opções) */
 function pnlFiltra(L,pula){const q=pnlSemAc(PNL.q).split(" ").filter(Boolean);
   return L.filter(o=>(pula==="tipo"||!PNL.tipo||o.tipo===PNL.tipo)&&(pula==="cat"||!PNL.cat||o.cat===PNL.cat)&&(pula==="vtr"||!PNL.vtr||o.vtrs.includes(PNL.vtr))&&(pula==="bairro"||!PNL.bairro||o.bairro===PNL.bairro)&&(!q.length||q.every(t=>o._t.includes(t))))}
-const pnlPos=o=>(o.coord&&pnlDist(o.coord,PNL_CENTRO)<=150000?o.coord:null)||(PNL.aprox?o.aprox:null);
+/* aceita coordenada em todo o Pará (com folga); fora disso (ex.: sem o sinal de menos) é ignorada */
+const pnlNoPara=c=>c[0]>=-10.2&&c[0]<=2.9&&c[1]>=-59.2&&c[1]<=-45.7;
+const pnlPos=o=>(o.coord&&pnlNoPara(o.coord)?o.coord:null)||(PNL.aprox?o.aprox:null);
 const pnlDataBR=s=>s?s.split("-").reverse().join("/"):"";
 function pnlBarras(L,total,attr,sel,cor){if(!L.length)return `<span class="hint">Nada neste filtro.</span>`;
   return L.map(([k,n])=>`<button type="button" class="pnl-bar ${sel===k?"on":""}" ${attr}="${esc(k)}"><span class="pnl-bk">${cor?`<i class="pnl-dot" style="background:${cor(k)}"></i>`:""}${esc(k)}${attr==="data-pt"&&TIPO_CAT[k]?`<small>${esc(TIPO_CAT[k])}</small>`:""}</span><span class="pnl-bt"><i style="width:${Math.max(3,Math.round(100*n/Math.max(1,total)))}%${cor?";background:"+cor(k):""}"></i></span><b>${n}</b></button>`).join("")}
@@ -2722,7 +2724,7 @@ function pnlEnquadra(){const T=pnlCvTam(),pts=(PNL.F||[]).map(pnlPos).filter(Boo
   if(!pts.length){PNL.vw={la:PNL_CENTRO[0],lo:PNL_CENTRO[1],z:h/0.07};return}
   let a=1e9,b=-1e9,c=1e9,d=-1e9;pts.forEach(([la,lo])=>{a=Math.min(a,la);b=Math.max(b,la);c=Math.min(c,lo);d=Math.max(d,lo)});
   const sla=Math.max(b-a,0.006),slo=Math.max(d-c,0.006);PNL.vw={la:(a+b)/2,lo:(c+d)/2,z:Math.min(h/(sla*1.35),w/(slo*1.35))};pnlLimZ()}
-function pnlLimZ(){const v=PNL.vw;if(!v)return;v.z=Math.min(Math.max(v.z,900),1200000)}
+function pnlLimZ(){const v=PNL.vw;if(!v)return;v.z=Math.min(Math.max(v.z,20),1200000)}
 function pnlZoom(f,px,py){const T=pnlCvTam(),v=PNL.vw;if(!T||!v)return;if(px===undefined){px=T.w/2;py=T.h/2}
   const la=v.la-(py-T.h/2)/v.z,lo=v.lo+(px-T.w/2)/v.z;v.z*=f;pnlLimZ();v.la=la+(py-T.h/2)/v.z;v.lo=lo-(px-T.w/2)/v.z}
 function pnlCores(){const cs=getComputedStyle(document.documentElement),g=k=>cs.getPropertyValue(k).trim();const sf=g("--surface")||"#fff";
@@ -2734,6 +2736,13 @@ function pnlDesenha(){const T=pnlCvTam();if(!T||!PNL.vw)return;const {cv,w,h}=T,
   const X=lo=>w/2+(lo-v.lo)*zx,Y=la=>h/2-(la-v.la)*v.z;const pxm=v.z/111320;
   const vis=bx=>!(X(bx[3])<-20||X(bx[2])>w+20||Y(bx[0])<-20||Y(bx[1])>h+20);
   x.fillStyle=C.fundo;x.fillRect(0,0,w,h);let M=null;try{M=pnlMapa()}catch(e){}
+  if(M&&pxm<0.03)M={agua:M.agua,ruas:[],bairros:[]};/* longe: só o rio; as ruas de Altamira ficam para o zoom perto */
+  if(pxm<0.2){/* grade de latitude/longitude para se localizar quando o mapa está afastado */
+    const pas=[0.1,0.25,0.5,1,2,5,10],pg=pas.find(q=>q*v.z>=70)||10;x.font="600 10.5px "+(getComputedStyle(document.body).fontFamily||"sans-serif");x.lineWidth=1;x.strokeStyle=C.txt;x.fillStyle=C.txt;x.textBaseline="top";x.textAlign="left";x.globalAlpha=.22;
+    const la0=v.la-h/2/v.z,la1=v.la+h/2/v.z,lo0=v.lo-w/2/zx,lo1=v.lo+w/2/zx;
+    for(let g=Math.ceil(la0/pg)*pg;g<=la1;g+=pg){const yy=Y(g);x.beginPath();x.moveTo(0,yy);x.lineTo(w,yy);x.stroke();x.globalAlpha=.8;x.fillText(g.toFixed(2).replace(/\.?0+$/,"")+"°",4,yy+2);x.globalAlpha=.22}
+    for(let g=Math.ceil(lo0/pg)*pg;g<=lo1;g+=pg){const xx=X(g);x.beginPath();x.moveTo(xx,0);x.lineTo(xx,h);x.stroke();x.globalAlpha=.8;x.fillText(g.toFixed(2).replace(/\.?0+$/,"")+"°",xx+3,h-14);x.globalAlpha=.22}
+    x.globalAlpha=1;const ax=X(PNL_CENTRO[1]),ay=Y(PNL_CENTRO[0]);x.beginPath();x.arc(ax,ay,4,0,7);x.fillStyle=C.txt;x.fill();x.font="700 11px "+(getComputedStyle(document.body).fontFamily||"sans-serif");x.lineWidth=3;x.strokeStyle=C.halo;x.strokeText("Altamira",ax+7,ay-5);x.fillText("Altamira",ax+7,ay-5)}
   if(M){x.fillStyle=C.agua;M.agua.forEach(a=>{if(!vis(a.bx))return;x.beginPath();a.p.forEach(([la,lo],i)=>i?x.lineTo(X(lo),Y(la)):x.moveTo(X(lo),Y(la)));x.closePath();x.fill()});
     x.lineCap="round";x.lineJoin="round";
     const larg=[[12,1.6,9],[9,1.1,7],[6,0.6,5]];
@@ -2750,9 +2759,9 @@ function pnlDesenha(){const T=pnlCvTam();if(!T||!PNL.vw)return;const {cv,w,h}=T,
     x.font="700 12px "+(getComputedStyle(document.body).fontFamily||"sans-serif");x.textAlign="center";
     M.bairros.forEach(b=>{const bx=X(b.p[1]),by=Y(b.p[0]);if(bx<0||bx>w||by<0||by>h)return;const t=b.n.toUpperCase(),tw=x.measureText(t).width;if(!cabe(bx-tw/2,by-8,bx+tw/2,by+8))return;rot.push([bx-tw/2,by-8,bx+tw/2,by+8]);x.lineWidth=3;x.strokeStyle=C.halo;x.strokeText(t,bx,by);x.fillStyle=C.txt;x.globalAlpha=.75;x.fillText(t,bx,by);x.globalAlpha=1})}
   /* ocorrências: agrupadas por área; círculo no meio das ocorrências da área, cor e tamanho pela quantidade */
-  const H=[];PNL.hits=H;const F=(PNL.F||[]).filter(pnlPos),dla=PNL.cel/111320,dlo=PNL.cel/(111320*k),cel=new Map(),fam=getComputedStyle(document.body).fontFamily||"sans-serif";
+  const H=[];PNL.hits=H;const F=(PNL.F||[]).filter(pnlPos),celE=Math.max(PNL.cel,40/pxm),dla=celE/111320,dlo=celE/(111320*k),cel=new Map(),fam=getComputedStyle(document.body).fontFamily||"sans-serif";
   F.forEach(o=>{const [la,lo]=pnlPos(o),kk=Math.floor(la/dla)+":"+Math.floor(lo/dlo);if(!cel.has(kk))cel.set(kk,{s:[0,0],itens:[]});const c=cel.get(kk);c.s[0]+=la;c.s[1]+=lo;c.itens.push(o)});
-  const L=[...cel.values()],mx=Math.max(1,...L.map(c=>c.itens.length)),celPx=PNL.cel*pxm;
+  const L=[...cel.values()],mx=Math.max(1,...L.map(c=>c.itens.length)),celPx=celE*pxm;
   L.sort((a,b)=>a.itens.length-b.itens.length).forEach(c=>{const n=c.itens.length,px=X(c.s[1]/n),py=Y(c.s[0]/n),r=Math.max(12+Math.min(10,4*Math.sqrt(n-1)),celPx*.5*(.55+.6*Math.sqrt(n/mx)));
     if(px<-r||px>w+r||py<-r||py>h+r)return;const cor=PNL_CALOR[pnlNivel(n,mx)];
     x.beginPath();x.arc(px,py,r,0,7);x.globalAlpha=.42;x.fillStyle=cor;x.fill();x.globalAlpha=1;x.lineWidth=2;x.strokeStyle=cor;x.stroke();
@@ -2760,7 +2769,7 @@ function pnlDesenha(){const T=pnlCvTam();if(!T||!PNL.vw)return;const {cv,w,h}=T,
     if(r>34){const tp=pnlConta(c.itens,o=>o.tipo)[0][0],t=tp.length>24?tp.slice(0,23)+"…":tp;x.font="600 10.5px "+fam;x.strokeText(t,px,py+15);x.fillText(t,px,py+15)}
     H.push({c:[px,py],r,itens:c.itens})});
   /* escala */
-  const alvo=w/5/pxm,pass=[50,100,200,500,1000,2000,5000,10000],m=pass.find(p=>p>=alvo)||10000,lw=m*pxm;x.fillStyle=C.txt;x.fillRect(12,h-14,lw,3);x.font="600 11px "+(getComputedStyle(document.body).fontFamily||"sans-serif");x.textAlign="left";x.textBaseline="bottom";x.fillText(m>=1000?m/1000+" km":m+" m",12,h-17)}
+  const alvo=w/5/pxm,pass=[50,100,200,500,1000,2000,5000,10000,20000,50000,100000,200000,500000],m=pass.find(p=>p>=alvo)||500000,lw=m*pxm;x.fillStyle=C.txt;x.fillRect(12,h-14,lw,3);x.font="600 11px "+(getComputedStyle(document.body).fontFamily||"sans-serif");x.textAlign="left";x.textBaseline="bottom";x.fillText(m>=1000?m/1000+" km":m+" m",12,h-17)}
 function pnlFechaPop(){const p=$("#pnlPop");if(p){p.hidden=true;p.innerHTML=""}}
 function pnlPopup(hit,px,py){const P=$("#pnlPop"),W=$("#pnlMapW");if(!P||!W)return;const L=hit.itens,tp=pnlConta(L,o=>o.tipo),ba=pnlConta(L,o=>o.bairro).slice(0,3),ru=pnlConta(L,o=>o.rua).slice(0,3),dias=new Set(L.map(o=>o.data));
   P.innerHTML=`<div class="pnl-ph"><b>${L.length} ocorrência${L.length===1?"":"s"} nesta área</b><button type="button" class="btn ghost small" data-pfecha aria-label="Fechar">✕</button></div>
