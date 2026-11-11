@@ -3618,11 +3618,15 @@ function lvLinkModal(){
   openModal(`<header><h3>Enviar o serviço ao Comandante</h3><button class="btn ghost" data-x>Fechar</button></header><div class="body">
    <div class="f"><label for="lvLD">Serviço (dia em que começou)</label><input class="in" type="date" id="lvLD" value="${S.inicio}"></div>
    <p class="hint">Gera um link com a guarnição, as saídas, o minuto a minuto, as pessoas e o mapa de ronda deste serviço. O Comandante toca no link e o Livro abre já preenchido. Se o WhatsApp cortar o link, ele copia a mensagem inteira e usa <b>Colar mensagem do WhatsApp</b> no Livro. Os dados vão dentro do próprio link, compactados: não passam por nenhum site. Cuidado: tem nomes de pessoas atendidas; mande só para o Comandante.</p>
-   <div class="row"><button class="btn primary" id="lvLZap">Enviar pelo WhatsApp</button><button class="btn" id="lvLCopia">Copiar o link</button></div><div class="hint" id="lvLInfo"></div></div>`);
+   <div class="row"><button class="btn primary" id="lvLZap">Enviar pelo WhatsApp</button><button class="btn" id="lvLCopia">Copiar o link</button><button class="btn" id="lvLTxt" title="Gera um arquivo .txt só com o link, para abrir, selecionar tudo (Ctrl+A) e copiar sem cortar">Enviar o link em arquivo de texto</button></div><div class="hint" id="lvLInfo"></div></div>`);
   box.querySelector("[data-x]").onclick=closeModal;
   const gera=async()=>{const d=$("#lvLD").value;if(!d)return null;flush();const u=await lvLinkServico(d);if(!u){toast("Não há juntada desse dia.");return null}
     $("#lvLInfo").textContent=u.length>3500?"Serviço grande: link com "+u.length+" caracteres. Se no WhatsApp o link não abrir inteiro, quem recebeu pode copiar a mensagem toda e usar “Colar mensagem do WhatsApp” no Livro, ou mande o PDF em “Exportar o serviço”.":"Link com "+u.length+" caracteres.";return {d,u}};
   $("#lvLZap").onclick=async()=>{const r=await gera();if(r)window.open("https://wa.me/?text="+encodeURIComponent(lvMsgLink(r.d,r.u)),"_blank")};
+  /* arquivo .txt só com o link (nada mais): o WhatsApp não corta, e dá para abrir, Ctrl+A e copiar o link inteiro */
+  $("#lvLTxt").onclick=async()=>{const r=await gera();if(!r)return;const nome="link-livro-"+r.d+".txt",blob=new Blob([r.u],{type:"text/plain"}),file=new File([blob],nome,{type:"text/plain"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e&&e.name==="AbortError")return}}
+    baixarBlob(blob,nome);toast("Arquivo "+nome+" baixado. Envie-o pelo WhatsApp como documento.")};
   $("#lvLCopia").onclick=async()=>{const r=await gera();if(!r)return;try{await navigator.clipboard.writeText(lvMsgLink(r.d,r.u));toast("Link copiado. Cole no WhatsApp.")}catch(e){toast("Não consegui copiar. Use “Enviar pelo WhatsApp”.")}}}
 /* ao abrir o app com #livro=...: destranca o Livro neste aparelho e oferece importar o serviço */
 let lvLinkFeito="";
