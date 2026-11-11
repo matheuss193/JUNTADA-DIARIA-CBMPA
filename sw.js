@@ -1,5 +1,5 @@
 // Juntada 9º GBM — © 2026 Matheus Henrique da Cruz Carvalho (mhcc.2026.jgbm9.7c41e0b9d2) — funciona sem internet depois da primeira abertura.
-const VERSAO = "juntada-v37";
+const VERSAO = "juntada-v38";
 const APP = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
@@ -15,8 +15,16 @@ self.addEventListener("fetch", e => {
   if (url.origin !== location.origin) return;
   // Página: tenta a rede (para receber atualizações), cai no cache sem internet.
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(r => { if (r.ok) { const c = r.clone(); caches.open(VERSAO).then(x => x.put("index.html", c)); } return r; })
-      .catch(() => caches.match("index.html").then(h => h || caches.match("./"))));
+    // Internet lenta (comum na guarda): espera a rede no máximo 4 s; depois abre a cópia guardada e a rede só atualiza o cache.
+    const rede = fetch(req).then(r => { if (r.ok) { const c = r.clone(); caches.open(VERSAO).then(x => x.put("index.html", c)); } return r; });
+    const doCache = () => caches.match("index.html").then(h => h || caches.match("./"));
+    e.respondWith(new Promise(res => {
+      let feito = false;
+      const fim = r => { if (!feito && r) { feito = true; res(r); } };
+      const t = setTimeout(() => doCache().then(fim), 4000);
+      rede.then(r => { clearTimeout(t); fim(r); })
+        .catch(() => doCache().then(h => { clearTimeout(t); fim(h || Response.error()); }));
+    }));
     return;
   }
   // Arquivos do app (ícones, manifesto): cache primeiro, atualiza em segundo plano.
