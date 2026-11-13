@@ -1303,9 +1303,10 @@ function guTexto(){const g=gu(),a=parseISO(S.inicio),B=[];
   const um=F_GU.filter(f=>f.t!=="chips").map(f=>{const v=String(g[f.k]||"").trim();return v?`▸ *${GU_LBL[f.k]}:* ${v.toUpperCase()}`:""}).filter(Boolean);
   if(um.length)B.push(`⭐ *Comando e condutores*\n`+um.join("\n"));
   F_GU.filter(f=>f.t==="chips"&&!(g.junta&&f.k==="salvamento")).forEach(f=>{const l=linhas(g[f.k]);const tit=g.junta&&f.k==="incendio"?"Guarnição de Incêndio/Salvamento":GU_LBL[f.k];if(l.length)B.push(`👥 *${tit}*\n`+l.map(n=>`• ${n.toUpperCase()}`).join("\n"))});
+  {const pm=(S.permutas||[]).filter(q=>q&&q.entra&&q.sai);if(pm.length)B.push(`🔁 *Permuta${pm.length>1?"s":""}*\n`+pm.map(q=>`• ${String(q.entra).toUpperCase()} em lugar de ${String(q.sai).toUpperCase()}`).join("\n"))}/* a permuta sai só aqui, na mensagem da guarnição; não vai nas saídas nem nas ocorrências */
   return B.join("\n\n")}
 async function compartilhaTexto(txt){if(navigator.share&&!inFrame){try{await navigator.share({text:txt});return}catch(e){if(e&&e.name==="AbortError")return}}copiar(txt)}
-/* permuta: quem montou serviço no lugar de outro. Vale para o dia e vai sozinha para o item VII da Parte e para o minuto a minuto */
+/* permuta: quem montou serviço no lugar de outro. Vale para o dia e vai sozinha para o item VII da Parte e para a mensagem da guarnição (só nela, não nas saídas) */
 let permAb=null;
 function desenhaPerm(){const A=$("#guPerm");if(!A)return;if(document.activeElement&&A.contains(document.activeElement)&&document.activeElement.id==="permSai")return;
   const P=S.permutas||[],pess=[...new Map([...guNomes(),...P.map(p=>p.entra)].map(x=>String(x||"").trim()).filter(Boolean).map(x=>[norm(x),x])).values()];
@@ -1318,7 +1319,7 @@ function desenhaPerm(){const A=$("#guPerm");if(!A)return;if(document.activeEleme
   A.querySelectorAll("[data-perm]").forEach(b=>b.onclick=()=>{permAb=+b.dataset.perm;desenhaPerm();const i=A.querySelector("#permSai");if(i)i.focus()});
   A.querySelectorAll("[data-permno]").forEach(b=>b.onclick=()=>{permAb=null;desenhaPerm()});
   A.querySelectorAll("[data-permok]").forEach(b=>b.onclick=()=>{const v=A.querySelector("#permSai").value.trim().toUpperCase(),n=pess[permAb];if(!v||!n){toast("Escreva quem foi substituído.");return}
-    S.permutas=(S.permutas||[]).filter(p=>norm(p.entra)!==norm(n));S.permutas.push({id:uid(),entra:n,sai:v});permAb=null;touch();desenhaPerm();toast("Permuta anotada: vai para o item VII da Parte e para o minuto a minuto.")});
+    S.permutas=(S.permutas||[]).filter(p=>norm(p.entra)!==norm(n));S.permutas.push({id:uid(),entra:n,sai:v});permAb=null;touch();desenhaPerm();toast("Permuta anotada: vai para o item VII da Parte e para a mensagem da guarnição.")});
   A.querySelectorAll("[data-permx]").forEach(b=>b.onclick=()=>{S.permutas=(S.permutas||[]).filter(p=>p.id!==b.dataset.permx);if(!S.permutas.length)delete S.permutas;touch();desenhaPerm()})}
 function renderGu(force){const g=gu(),V=$("#guForm");if(!V)return;
   desenhaPerm();
@@ -1827,8 +1828,6 @@ function mmTexto(r,i){i=i||0;const m=mmGet(r,i),v=k=>mmVal(r,k,i),G=ocVtrs(r,i),
   if(v("coord")){l.push(`🌐 *Coordenadas:* ${v("coord")}`);const mp=coordMapa(v("coord"));if(mp)l.push(`🗺️ *Abrir no mapa:* ${mp}`)}
   if(l.length)B.push(l.join("\n"));
   mmGuarnicoes(r,i).forEach(b=>B.push(b));
-  {const nm=new Set(G.flatMap(x=>[x.condutor,x.cmt,...linhas(x.guarnicao)]).map(norm).filter(Boolean)),pm=(S.permutas||[]).filter(q=>nm.has(norm(q.entra)));
-   if(pm.length)B.push(pm.map(q=>`🔁 *Permuta:* ${q.entra} em lugar de ${q.sai}`).join(String.fromCharCode(10)))}
   if(m.obs.trim())B.push(`💬 *Observações*\n${m.obs.trim().toUpperCase()}`);
   {const qra=String(r.sentinela||"").trim()||sentinelaEm(v("saida"),r.antes);if(qra)B.push(`*QRA:* ${qra.toUpperCase()}`)}/* QRA = sentinela do quarto de hora (mapa de ronda) */
   return B.join("\n\n")}
